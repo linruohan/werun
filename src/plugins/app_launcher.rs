@@ -1,11 +1,15 @@
+use std::{
+    process::Command,
+    sync::{Arc, Mutex},
+};
+
+use anyhow::Result;
+
 /// 应用启动插件
 ///
 /// 扫描并启动 Windows 应用程序
 use crate::core::plugin::Plugin;
 use crate::core::search::{ActionData, ResultType, SearchResult};
-use anyhow::Result;
-use std::process::Command;
-use std::sync::{Arc, Mutex};
 
 /// 应用信息
 #[derive(Clone, Debug)]
@@ -31,10 +35,7 @@ pub struct AppLauncherPlugin {
 impl AppLauncherPlugin {
     /// 创建新的应用启动插件
     pub fn new() -> Self {
-        Self {
-            enabled: true,
-            apps: Arc::new(Mutex::new(Vec::new())),
-        }
+        Self { enabled: true, apps: Arc::new(Mutex::new(Vec::new())) }
     }
 
     /// 扫描开始菜单中的应用
@@ -96,10 +97,7 @@ impl AppLauncherPlugin {
     fn parse_shortcut(&self, path: &std::path::Path) -> Option<AppInfo> {
         // TODO: 使用 lnk crate 解析快捷方式
         // 目前简化处理，仅提取文件名
-        let name = path
-            .file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_default();
+        let name = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
 
         Some(AppInfo {
             name,
@@ -120,9 +118,7 @@ impl AppLauncherPlugin {
         };
 
         // 启动应用
-        Command::new("cmd")
-            .args(["/c", "start", "", &target_path])
-            .spawn()?;
+        Command::new("cmd").args(["/c", "start", "", &target_path]).spawn()?;
 
         Ok(())
     }
@@ -182,10 +178,7 @@ impl Plugin for AppLauncherPlugin {
                     icon: app.icon.clone(),
                     result_type: ResultType::Application,
                     score: 100, // TODO: 实现更好的评分算法
-                    action: ActionData::LaunchApp {
-                        path: app.path.clone(),
-                        args: Vec::new(),
-                    },
+                    action: ActionData::LaunchApp { path: app.path.clone(), args: Vec::new() },
                 });
 
                 if results.len() >= limit {

@@ -1,11 +1,15 @@
+use std::sync::{Arc, Mutex};
+
+use anyhow::Result;
+
 /// 文件搜索插件
 ///
 /// 提供文件搜索功能
 use crate::core::plugin::Plugin;
-use crate::core::search::{ActionData, ResultType, SearchResult};
-use crate::utils::fuzzy::fuzzy_match;
-use anyhow::Result;
-use std::sync::{Arc, Mutex};
+use crate::{
+    core::search::{ActionData, ResultType, SearchResult},
+    utils::fuzzy::fuzzy_match,
+};
 
 /// 文件信息
 #[derive(Clone, Debug)]
@@ -40,15 +44,9 @@ impl FileSearchPlugin {
     /// 创建新的文件搜索插件
     pub fn new() -> Self {
         let search_paths = vec![
-            dirs::desktop_dir()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default(),
-            dirs::document_dir()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default(),
-            dirs::download_dir()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default(),
+            dirs::desktop_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+            dirs::document_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+            dirs::download_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
         ];
 
         let ignore_dirs = vec![
@@ -109,10 +107,8 @@ impl FileSearchPlugin {
 
                 let metadata = entry.metadata().ok();
 
-                let name = path
-                    .file_name()
-                    .map(|s| s.to_string_lossy().to_string())
-                    .unwrap_or_default();
+                let name =
+                    path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
 
                 let is_dir = path.is_dir();
                 let size = metadata.as_ref().map(|m| m.len()).unwrap_or(0);
@@ -214,11 +210,7 @@ impl Plugin for FileSearchPlugin {
             let (matched, score) = fuzzy_match(query, &file.name);
 
             if matched {
-                let result_type = if file.is_dir {
-                    ResultType::Folder
-                } else {
-                    ResultType::File
-                };
+                let result_type = if file.is_dir { ResultType::Folder } else { ResultType::File };
 
                 let description = if file.is_dir {
                     "文件夹".to_string()
@@ -233,9 +225,7 @@ impl Plugin for FileSearchPlugin {
                     icon: None,
                     result_type,
                     score,
-                    action: ActionData::OpenFile {
-                        path: file.path.clone(),
-                    },
+                    action: ActionData::OpenFile { path: file.path.clone() },
                 });
 
                 if results.len() >= limit {

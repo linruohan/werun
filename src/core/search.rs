@@ -71,10 +71,7 @@ pub struct SearchEngine {
 impl SearchEngine {
     /// 创建新的搜索引擎
     pub fn new() -> Self {
-        Self {
-            query: String::new(),
-            limit: 50,
-        }
+        Self { query: String::new(), limit: 50 }
     }
 
     /// 设置搜索查询

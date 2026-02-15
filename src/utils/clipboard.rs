@@ -2,11 +2,13 @@
 ///
 /// 提供 Windows 剪贴板读写功能
 use windows::Win32::Foundation::{HANDLE, HGLOBAL, HWND};
-use windows::Win32::System::DataExchange::{
-    CloseClipboard, EmptyClipboard, GetClipboardData, OpenClipboard, SetClipboardData,
+use windows::Win32::System::{
+    DataExchange::{
+        CloseClipboard, EmptyClipboard, GetClipboardData, OpenClipboard, SetClipboardData,
+    },
+    Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE},
+    Ole::CF_UNICODETEXT,
 };
-use windows::Win32::System::Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE};
-use windows::Win32::System::Ole::CF_UNICODETEXT;
 
 /// 剪贴板管理器
 pub struct ClipboardManager;

@@ -1,7 +1,8 @@
-///
+use std::path::PathBuf;
+
+use gpui::App;
 /// 管理启动器的所有配置项
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 /// 应用配置
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -101,10 +102,7 @@ pub struct ThemeConfig {
 
 impl Default for ThemeConfig {
     fn default() -> Self {
-        Self {
-            current_theme: "dark".to_string(),
-            follow_system: true,
-        }
+        Self { current_theme: "dark".to_string(), follow_system: true }
     }
 }
 
@@ -130,12 +128,8 @@ impl Default for SearchConfig {
             debounce_ms: 50,
             enable_file_search: true,
             file_search_paths: vec![
-                dirs::desktop_dir()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default(),
-                dirs::document_dir()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default(),
+                dirs::desktop_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
+                dirs::document_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
             ],
             file_ignore_patterns: vec![
                 "*.tmp".to_string(),

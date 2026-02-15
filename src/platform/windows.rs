@@ -2,14 +2,19 @@
 ///
 /// 提供全局快捷键、窗口管理等 Windows API 封装
 use std::sync::Mutex;
-use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS, MOD_ALT, VK_SPACE,
-};
-use windows::Win32::UI::WindowsAndMessaging::{
-    CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassW,
-    TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, MSG, WM_HOTKEY, WNDCLASSW,
-    WS_EX_NOACTIVATE, WS_OVERLAPPED,
+
+use windows::Win32::{
+    Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM},
+    UI::{
+        Input::KeyboardAndMouse::{
+            RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS, MOD_ALT, VK_SPACE,
+        },
+        WindowsAndMessaging::{
+            CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, RegisterClassW,
+            TranslateMessage, CS_HREDRAW, CS_VREDRAW, CW_USEDEFAULT, MSG, WM_HOTKEY, WNDCLASSW,
+            WS_EX_NOACTIVATE, WS_OVERLAPPED,
+        },
+    },
 };
 
 /// 全局快捷键管理器
@@ -34,10 +39,7 @@ impl GlobalHotkeyManager {
     pub fn new() -> anyhow::Result<Self> {
         let hwnd = Self::create_message_window()?;
 
-        Ok(Self {
-            hwnd,
-            registered: false,
-        })
+        Ok(Self { hwnd, registered: false })
     }
 
     /// 注册 Alt+Space 全局快捷键
@@ -56,12 +58,7 @@ impl GlobalHotkeyManager {
 
         // 注册全局快捷键 Alt+Space
         unsafe {
-            RegisterHotKey(
-                self.hwnd,
-                HOTKEY_ID,
-                HOT_KEY_MODIFIERS(MOD_ALT.0),
-                VK_SPACE.0 as u32,
-            )?;
+            RegisterHotKey(self.hwnd, HOTKEY_ID, HOT_KEY_MODIFIERS(MOD_ALT.0), VK_SPACE.0 as u32)?;
         }
 
         self.registered = true;
@@ -99,15 +96,11 @@ impl GlobalHotkeyManager {
                 windows::Win32::System::LibraryLoader::GetModuleHandleW(None)?.into();
 
             // 注册窗口类
-            let class_name: Vec<u16> = WINDOW_CLASS_NAME
-                .encode_utf16()
-                .chain(std::iter::once(0))
-                .collect();
+            let class_name: Vec<u16> =
+                WINDOW_CLASS_NAME.encode_utf16().chain(std::iter::once(0)).collect();
 
-            let window_title: Vec<u16> = "WeRun Hotkey Window"
-                .encode_utf16()
-                .chain(std::iter::once(0))
-                .collect();
+            let window_title: Vec<u16> =
+                "WeRun Hotkey Window".encode_utf16().chain(std::iter::once(0)).collect();
 
             let wnd_class = WNDCLASSW {
                 lpfnWndProc: Some(Self::window_proc),
@@ -160,7 +153,7 @@ impl GlobalHotkeyManager {
                     }
                 }
                 LRESULT(0)
-            }
+            },
             _ => DefWindowProcW(hwnd, msg, wparam, lparam),
         }
     }

@@ -25,10 +25,6 @@ impl LauncherApp {
 
 impl Render for LauncherApp {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .size_full()
-            .flex()
-            .flex_col()
-            .child(self.window_view.clone())
+        div().size_full().flex().flex_col().child(self.window_view.clone())
     }
 }

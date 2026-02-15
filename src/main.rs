@@ -14,6 +14,7 @@ use gpui::{
     WindowBackgroundAppearance, WindowBounds, WindowKind, WindowOptions,
 };
 use gpui_component_assets::Assets;
+use werun::init;
 
 fn main() {
     // 初始化日志
@@ -23,6 +24,8 @@ fn main() {
 
     // 启动 GPUI 应用
     app.run(move |cx| {
+        init(cx);
+        cx.activate(true);
         // 打开启动器窗口
         open_launcher_window(cx);
     });
@@ -57,16 +60,15 @@ fn open_launcher_window(cx: &mut App) {
     };
 
     // 创建窗口
-    let window_handle = cx.open_window(window_options, |window, cx| {
-        cx.new(|cx| LauncherApp::new(window, cx))
-    });
+    let window_handle =
+        cx.open_window(window_options, |window, cx| cx.new(|cx| LauncherApp::new(window, cx)));
 
     match window_handle {
         Ok(_handle) => {
             log::info!("启动器窗口已打开");
-        }
+        },
         Err(e) => {
             log::error!("打开窗口失败: {:?}", e);
-        }
+        },
     }
 }

@@ -1,18 +1,22 @@
+use std::sync::Arc;
+
 /// 启动器主窗口
 ///
 /// 包含搜索栏、结果列表和预览面板的完整界面
 use gpui::*;
-use gpui_component::Icon;
-use gpui_component::IconName;
-use std::sync::Arc;
+use gpui_component::{theme::ActiveTheme, Icon, IconName};
 
-use crate::core::plugin::PluginManager;
-use crate::core::search::{ResultType, SearchEngine, SearchResult};
-use crate::plugins::app_launcher::AppLauncherPlugin;
-use crate::plugins::calculator::CalculatorPlugin;
-use crate::plugins::clipboard::ClipboardPlugin;
-use crate::plugins::file_search::FileSearchPlugin;
-use crate::utils::clipboard::ClipboardManager;
+use crate::{
+    core::{
+        plugin::PluginManager,
+        search::{ActionData, ResultType, SearchResult},
+    },
+    plugins::{
+        app_launcher::AppLauncherPlugin, calculator::CalculatorPlugin, clipboard::ClipboardPlugin,
+        file_search::FileSearchPlugin,
+    },
+    utils::clipboard::ClipboardManager,
+};
 
 /// 启动器窗口状态
 pub struct LauncherWindow {
@@ -22,8 +26,6 @@ pub struct LauncherWindow {
     results: Vec<SearchResult>,
     /// 当前选中索引
     selected_index: usize,
-    /// 搜索引擎
-    search_engine: SearchEngine,
     /// 插件管理器
     plugin_manager: Arc<PluginManager>,
     /// 剪贴板管理器
@@ -34,13 +36,17 @@ impl LauncherWindow {
     /// 创建新的启动器窗口
     pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
         // 初始化插件管理器
-        let plugin_manager = Self::init_plugins();
+        let mut plugin_manager = Self::init_plugins();
+
+        // 初始化所有插件
+        if let Err(e) = plugin_manager.initialize_all() {
+            log::error!("初始化插件失败: {:?}", e);
+        }
 
         Self {
             search_query: SharedString::default(),
             results: Vec::new(),
             selected_index: 0,
-            search_engine: SearchEngine::new(),
             plugin_manager: Arc::new(plugin_manager),
             clipboard_manager: ClipboardManager::new(),
         }
@@ -51,22 +57,18 @@ impl LauncherWindow {
         let mut manager = PluginManager::new();
 
         // 注册应用启动插件
-        let app_launcher = Arc::new(AppLauncherPlugin::new());
-        manager.register(app_launcher);
+        manager.register(AppLauncherPlugin::new());
 
         // 注册计算器插件
-        let calculator = Arc::new(CalculatorPlugin::new());
-        manager.register(calculator);
+        manager.register(CalculatorPlugin::new());
 
         // 注册剪贴板历史插件
-        let clipboard = Arc::new(ClipboardPlugin::new());
-        manager.register(clipboard);
+        manager.register(ClipboardPlugin::new());
 
         // 注册文件搜索插件
-        let file_search = Arc::new(FileSearchPlugin::new());
-        manager.register(file_search);
+        manager.register(FileSearchPlugin::new());
 
-        log::info!("已注册 {} 个插件", manager.all_plugins().len());
+        log::info!("已注册 {} 个插件", manager.plugin_count());
 
         manager
     }
@@ -77,13 +79,9 @@ impl LauncherWindow {
 
         self.search_query = query.clone().into();
 
-        // 更新搜索引擎查询
-        self.search_engine.set_query(&query);
-
         // 执行搜索
         if !query.is_empty() {
-            let plugins: Vec<_> = self.plugin_manager.enabled_plugins();
-            self.results = self.search_engine.search(&plugins);
+            self.results = self.plugin_manager.search_all(&query, 50);
         } else {
             self.results.clear();
         }
@@ -104,77 +102,66 @@ impl LauncherWindow {
                     self.selected_index = (self.selected_index + 1).min(self.results.len() - 1);
                     cx.notify();
                 }
-            }
+            },
             "arrowup" => {
                 // 向上导航
                 if self.selected_index > 0 {
                     self.selected_index -= 1;
                     cx.notify();
                 }
-            }
+            },
             "enter" => {
                 // 确认执行
                 if let Some(result) = self.results.get(self.selected_index) {
                     log::info!("执行: {:?}", result);
                     self.execute_result(result);
+                    // 执行后关闭窗口
+                    cx.emit(DismissEvent);
                 }
-            }
+            },
             "escape" => {
                 // 关闭窗口
                 cx.emit(DismissEvent);
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
 
     /// 执行搜索结果
     fn execute_result(&self, result: &SearchResult) {
-        // 根据结果类型找到对应的插件执行
-        let plugins = self.plugin_manager.enabled_plugins();
+        // 尝试通过插件管理器执行
+        if let Err(e) = self.plugin_manager.execute(result) {
+            log::error!("通过插件执行失败: {:?}", e);
 
-        for plugin in plugins {
-            // 简单匹配：根据 ID 前缀判断
-            if result.id.starts_with(&format!("{}:", plugin.id())) {
-                if let Err(e) = plugin.execute(result) {
-                    log::error!("执行失败: {:?}", e);
-                }
-                return;
-            }
-        }
-
-        // 如果没有匹配到特定插件，尝试根据类型执行
-        match &result.action {
-            crate::core::search::ActionData::LaunchApp { path, .. } => {
-                log::info!("启动应用: {}", path);
-                // 使用 cmd /c start 启动应用
-                let _ = std::process::Command::new("cmd")
-                    .args(["/c", "start", "", path])
-                    .spawn();
-            }
-            crate::core::search::ActionData::OpenFile { path } => {
-                log::info!("打开文件: {}", path);
-                let _ = std::process::Command::new("explorer").arg(path).spawn();
-            }
-            crate::core::search::ActionData::ExecuteCommand { command } => {
-                log::info!("执行命令: {}", command);
-                let _ = std::process::Command::new("cmd")
-                    .args(["/c", command])
-                    .spawn();
-            }
-            crate::core::search::ActionData::CopyToClipboard { text } => {
-                log::info!("复制到剪贴板: {}", text);
-                if let Err(e) = self.clipboard_manager.set_text(text) {
-                    log::error!("复制到剪贴板失败: {:?}", e);
-                }
-            }
-            crate::core::search::ActionData::OpenUrl { url } => {
-                log::info!("打开 URL: {}", url);
-                let _ = std::process::Command::new("cmd")
-                    .args(["/c", "start", "", url])
-                    .spawn();
-            }
-            _ => {
-                log::warn!("未知的动作类型");
+            // 如果插件执行失败，尝试根据类型执行
+            match &result.action {
+                ActionData::LaunchApp { path, .. } => {
+                    log::info!("启动应用: {}", path);
+                    let _ =
+                        std::process::Command::new("cmd").args(["/c", "start", "", path]).spawn();
+                },
+                ActionData::OpenFile { path } => {
+                    log::info!("打开文件: {}", path);
+                    let _ = std::process::Command::new("explorer").arg(path).spawn();
+                },
+                ActionData::ExecuteCommand { command } => {
+                    log::info!("执行命令: {}", command);
+                    let _ = std::process::Command::new("cmd").args(["/c", command]).spawn();
+                },
+                ActionData::CopyToClipboard { text } => {
+                    log::info!("复制到剪贴板: {}", text);
+                    if let Err(e) = self.clipboard_manager.set_text(text) {
+                        log::error!("复制到剪贴板失败: {:?}", e);
+                    }
+                },
+                ActionData::OpenUrl { url } => {
+                    log::info!("打开 URL: {}", url);
+                    let _ =
+                        std::process::Command::new("cmd").args(["/c", "start", "", url]).spawn();
+                },
+                _ => {
+                    log::warn!("未知的动作类型");
+                },
             }
         }
     }
@@ -182,12 +169,18 @@ impl LauncherWindow {
 
 impl Render for LauncherWindow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme();
+
         div()
             .size_full()
             .flex()
             .flex_col()
             .gap_2()
             .p_4()
+            .bg(theme.background)
+            .rounded_xl()
+            .border_1()
+            .border_color(theme.border)
             // 键盘事件处理
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
                 this.handle_key_event(event, cx);
@@ -203,11 +196,13 @@ impl Render for LauncherWindow {
                     .py_2()
                     .rounded_lg()
                     .border_1()
-                    .child(Icon::new(IconName::Search))
-                    .child(div().flex().flex_1().child("搜索输入框")),
+                    .border_color(theme.border)
+                    .bg(theme.secondary)
+                    .child(Icon::new(IconName::Search).text_color(theme.muted_foreground))
+                    .child(div().flex().flex_1().child(self.search_query.clone())),
             )
             // 分隔线
-            .child(div().h_px().w_full())
+            .child(div().h_px().w_full().bg(theme.border))
             // 结果列表
             .child(
                 div()
@@ -216,7 +211,7 @@ impl Render for LauncherWindow {
                     .gap_1()
                     .children(self.results.iter().enumerate().map(|(index, result)| {
                         let is_selected = index == self.selected_index;
-                        render_result_item(result, is_selected)
+                        render_result_item(result, is_selected, theme)
                     })),
             )
             // 底部状态栏
@@ -229,6 +224,7 @@ impl Render for LauncherWindow {
                     .px_2()
                     .py_1()
                     .text_sm()
+                    .text_color(theme.muted_foreground)
                     .child(format!("{} 个结果", self.results.len()))
                     .child("↑↓ 选择 · ↵ 执行 · Esc 关闭"),
             )
@@ -250,18 +246,16 @@ fn get_result_icon(result_type: &ResultType) -> IconName {
 }
 
 /// 渲染结果项
-fn render_result_item(result: &SearchResult, is_selected: bool) -> impl IntoElement {
-    let bg_color = if is_selected {
-        gpui::rgb(0x3b82f6) // 蓝色高亮
-    } else {
-        gpui::rgb(0x1e1e2e) // 默认背景
-    };
+fn render_result_item(
+    result: &SearchResult,
+    is_selected: bool,
+    theme: &gpui_component::Theme,
+) -> impl IntoElement {
+    let bg_color = if is_selected { theme.accent } else { theme.background };
 
-    let text_color = if is_selected {
-        gpui::rgb(0xffffff)
-    } else {
-        gpui::rgb(0xcdd6f4)
-    };
+    let text_color = if is_selected { theme.accent_foreground } else { theme.foreground };
+
+    let muted_color = if is_selected { theme.accent_foreground } else { theme.muted_foreground };
 
     let type_name = match &result.result_type {
         ResultType::Application => "应用",
@@ -294,8 +288,8 @@ fn render_result_item(result: &SearchResult, is_selected: bool) -> impl IntoElem
                 .w_8()
                 .h_8()
                 .rounded_md()
-                .bg(gpui::rgb(0x313244))
-                .child(Icon::new(icon)),
+                .bg(if is_selected { theme.accent_foreground } else { theme.secondary })
+                .child(Icon::new(icon).text_color(text_color)),
         )
         .child(
             div()
@@ -310,12 +304,7 @@ fn render_result_item(result: &SearchResult, is_selected: bool) -> impl IntoElem
                         .text_color(text_color)
                         .child(result.title.clone()),
                 )
-                .child(
-                    div()
-                        .text_xs()
-                        .text_color(gpui::rgb(0x6c7086))
-                        .child(result.description.clone()),
-                ),
+                .child(div().text_xs().text_color(muted_color).child(result.description.clone())),
         )
         .child(
             div()
@@ -323,8 +312,8 @@ fn render_result_item(result: &SearchResult, is_selected: bool) -> impl IntoElem
                 .py_0()
                 .rounded_full()
                 .text_xs()
-                .bg(gpui::rgb(0x313244))
-                .text_color(gpui::rgb(0x6c7086))
+                .bg(if is_selected { theme.accent_foreground } else { theme.secondary })
+                .text_color(muted_color)
                 .child(type_name),
         )
 }

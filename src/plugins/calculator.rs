@@ -1,9 +1,10 @@
+use anyhow::Result;
+
 /// 计算器插件
 ///
 /// 提供数学计算功能
 use crate::core::plugin::Plugin;
 use crate::core::search::{ActionData, ResultType, SearchResult};
-use anyhow::Result;
 
 /// 计算器插件
 pub struct CalculatorPlugin {
@@ -94,10 +95,7 @@ impl CalculatorPlugin {
             format!("{:.0}", value)
         } else {
             // 小数，保留适当精度
-            format!("{:.6}", value)
-                .trim_end_matches('0')
-                .trim_end_matches('.')
-                .to_string()
+            format!("{:.6}", value).trim_end_matches('0').trim_end_matches('.').to_string()
         }
     }
 

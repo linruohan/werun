@@ -1,11 +1,15 @@
+use std::sync::{Arc, Mutex};
+
+use anyhow::Result;
+
 /// 剪贴板历史插件
 ///
 /// 管理剪贴板历史记录
 use crate::core::plugin::Plugin;
-use crate::core::search::{ActionData, ResultType, SearchResult};
-use crate::utils::clipboard::ClipboardManager;
-use anyhow::Result;
-use std::sync::{Arc, Mutex};
+use crate::{
+    core::search::{ActionData, ResultType, SearchResult},
+    utils::clipboard::ClipboardManager,
+};
 
 /// 剪贴板条目
 #[derive(Clone, Debug)]
@@ -49,11 +53,7 @@ impl ClipboardPlugin {
             return;
         }
 
-        let preview = if text.len() > 100 {
-            format!("{}...", &text[..100])
-        } else {
-            text.clone()
-        };
+        let preview = if text.len() > 100 { format!("{}...", &text[..100]) } else { text.clone() };
 
         let entry = ClipboardEntry {
             id: format!("clip:{}", chrono::Local::now().timestamp_millis()),
@@ -81,10 +81,7 @@ impl ClipboardPlugin {
 
     /// 获取历史记录
     fn get_history(&self) -> Vec<ClipboardEntry> {
-        self.history
-            .lock()
-            .map(|guard| guard.clone())
-            .unwrap_or_default()
+        self.history.lock().map(|guard| guard.clone()).unwrap_or_default()
     }
 
     /// 格式化时间
@@ -161,9 +158,7 @@ impl Plugin for ClipboardPlugin {
                     icon: None,
                     result_type: ResultType::Clipboard,
                     score: 0, // 按时间排序
-                    action: ActionData::CopyToClipboard {
-                        text: entry.text.clone(),
-                    },
+                    action: ActionData::CopyToClipboard { text: entry.text.clone() },
                 });
             }
         } else {
@@ -180,9 +175,7 @@ impl Plugin for ClipboardPlugin {
                         icon: None,
                         result_type: ResultType::Clipboard,
                         score: 50, // 中等优先级
-                        action: ActionData::CopyToClipboard {
-                            text: entry.text.clone(),
-                        },
+                        action: ActionData::CopyToClipboard { text: entry.text.clone() },
                     });
 
                     if results.len() >= limit {

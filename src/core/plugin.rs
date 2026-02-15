@@ -1,9 +1,11 @@
+use std::sync::{Arc, Mutex};
+
+use anyhow::Result;
+
 /// 插件系统接口
 ///
 /// 定义所有插件必须实现的 trait
 use super::search::SearchResult;
-use anyhow::Result;
-use std::sync::Arc;
 
 /// 插件 trait
 ///
@@ -31,22 +33,9 @@ pub trait Plugin: Send + Sync {
     fn initialize(&mut self) -> Result<()>;
 
     /// 执行搜索
-    ///
-    /// # Arguments
-    /// * `query` - 搜索查询字符串
-    /// * `limit` - 最大返回结果数
-    ///
-    /// # Returns
-    /// 搜索结果列表
     fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchResult>>;
 
     /// 执行动作
-    ///
-    /// # Arguments
-    /// * `result` - 要执行的结果项
-    ///
-    /// # Returns
-    /// 执行是否成功
     fn execute(&self, result: &SearchResult) -> Result<()>;
 
     /// 刷新插件数据（如重新索引）
@@ -56,49 +45,78 @@ pub trait Plugin: Send + Sync {
 /// 插件管理器
 pub struct PluginManager {
     /// 已注册的插件列表
-    plugins: Vec<Arc<dyn Plugin>>,
+    plugins: Vec<Arc<Mutex<dyn Plugin>>>,
 }
 
 impl PluginManager {
     /// 创建新的插件管理器
     pub fn new() -> Self {
-        Self {
-            plugins: Vec::new(),
-        }
+        Self { plugins: Vec::new() }
     }
 
     /// 注册插件
-    pub fn register(&mut self, plugin: Arc<dyn Plugin>) {
-        log::info!("注册插件: {} ({})", plugin.name(), plugin.id());
+    pub fn register(&mut self, plugin: impl Plugin + 'static) {
+        let plugin = Arc::new(Mutex::new(plugin));
+        log::info!("注册插件");
         self.plugins.push(plugin);
     }
 
-    /// 获取所有启用的插件
-    pub fn enabled_plugins(&self) -> Vec<Arc<dyn Plugin>> {
-        self.plugins
-            .iter()
-            .filter(|p| p.is_enabled())
-            .cloned()
-            .collect()
-    }
-
-    /// 获取所有插件
-    pub fn all_plugins(&self) -> &[Arc<dyn Plugin>] {
-        &self.plugins
-    }
-
-    /// 根据 ID 查找插件
-    pub fn get_plugin(&self, id: &str) -> Option<Arc<dyn Plugin>> {
-        self.plugins.iter().find(|p| p.id() == id).cloned()
+    /// 获取所有插件数量
+    pub fn plugin_count(&self) -> usize {
+        self.plugins.len()
     }
 
     /// 初始化所有插件
     pub fn initialize_all(&mut self) -> Result<()> {
         for plugin in &self.plugins {
-            // 注意：这里需要可变引用，可能需要使用 Mutex 或 RwLock
-            log::info!("初始化插件: {}", plugin.name());
+            if let Ok(mut guard) = plugin.lock() {
+                log::info!("初始化插件: {}", guard.name());
+                if let Err(e) = guard.initialize() {
+                    log::error!("初始化插件 {} 失败: {:?}", guard.name(), e);
+                }
+            }
         }
         Ok(())
+    }
+
+    /// 搜索所有插件
+    pub fn search_all(&self, query: &str, limit: usize) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+
+        for plugin in &self.plugins {
+            if let Ok(guard) = plugin.lock() {
+                if guard.is_enabled() {
+                    match guard.search(query, limit) {
+                        Ok(mut plugin_results) => {
+                            results.append(&mut plugin_results);
+                        },
+                        Err(e) => {
+                            log::error!("插件 {} 搜索失败: {:?}", guard.name(), e);
+                        },
+                    }
+                }
+            }
+        }
+
+        // 按分数排序
+        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results.truncate(limit);
+
+        results
+    }
+
+    /// 执行结果
+    pub fn execute(&self, result: &SearchResult) -> Result<()> {
+        // 根据 ID 前缀找到对应的插件
+        for plugin in &self.plugins {
+            if let Ok(guard) = plugin.lock() {
+                if result.id.starts_with(&format!("{}:", guard.id())) {
+                    return guard.execute(result);
+                }
+            }
+        }
+
+        Err(anyhow::anyhow!("未找到对应的插件"))
     }
 }
 
