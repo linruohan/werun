@@ -17,6 +17,15 @@ use core::config_manager::global_config;
 use app::LauncherApp;
 use gpui_component_assets::Assets;
 use ui::create_new_window;
+
+/// 枚举窗口数据结构
+struct EnumData {
+    found_hwnd: Option<windows::Win32::Foundation::HWND>,
+}
+
+/// 全局快捷键管理器（使用 Box 和 leak 使其永久存活）
+static mut HOTKEY_MANAGER: Option<Box<platform::windows::GlobalHotkeyManager>> = None;
+
 fn main() {
     // 初始化日志
     env_logger::init();
@@ -49,21 +58,6 @@ fn main() {
     }
 }
 
-// /// 打开启动器主窗口
-// fn open_launcher_window(cx: &mut App) {
-//     // 创建窗口
-//     match cx.open_window(window_options, |window, cx| cx.new(|cx| LauncherApp::new(window, cx)))
-// {         Ok(handle) => {
-//             log::info!("启动器窗口已打开");
-//             // 设置窗口句柄到窗口管理器
-//             global_window_manager().set_window_handle(handle);
-//         },
-//         Err(e) => {
-//             log::error!("打开窗口失败: {:?}", e);
-//         },
-//     }
-// }
-
 /// 注册全局快捷键 Alt+Space
 fn register_global_hotkey() {
     use platform::windows::GlobalHotkeyManager;
@@ -74,17 +68,25 @@ fn register_global_hotkey() {
 
     std::thread::spawn(move || {
         // 等待窗口创建完成
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        std::thread::sleep(std::time::Duration::from_millis(2000));
+
+        log::info!("开始注册全局快捷键...");
 
         match GlobalHotkeyManager::new() {
             Ok(mut manager) => {
+                log::info!("快捷键管理器创建成功");
                 if let Err(e) = manager.register_alt_space(|| {
                     log::info!("Alt+Space 快捷键被触发");
-                    // 使用 GPUI 的 AppContext 来切换窗口
-                    // 这里需要通过消息队列或其他线程安全的方式
-                    // 暂时只记录日志，实际实现需要在主线程中执行
+                    // 切换窗口显示/隐藏
+                    toggle_launcher_window();
                 }) {
                     log::error!("注册全局快捷键失败: {:?}", e);
+                } else {
+                    // 将 manager 放入全局变量，防止被 Drop
+                    unsafe {
+                        HOTKEY_MANAGER = Some(Box::new(manager));
+                        log::info!("全局快捷键管理器已保存");
+                    }
                 }
             },
             Err(e) => {
@@ -95,8 +97,91 @@ fn register_global_hotkey() {
 }
 
 /// 切换窗口显示/隐藏（供快捷键调用）
-pub fn toggle_launcher_window() {
+fn toggle_launcher_window() {
     log::info!("请求切换窗口状态");
-    // 这里需要通过 GPUI 的事件系统在主线程中执行
-    // 暂时只记录日志
+
+    // 使用 Windows API 直接操作窗口
+    use windows::Win32::{
+        Foundation::LPARAM,
+        UI::WindowsAndMessaging::{EnumWindows, FindWindowW},
+    };
+
+    unsafe {
+        // 尝试多种方式查找窗口
+
+        // 方式1：通过窗口标题查找
+        let window_name: Vec<u16> = "WeRun".encode_utf16().chain(std::iter::once(0)).collect();
+        log::info!("尝试查找窗口标题: WeRun");
+
+        match FindWindowW(None, windows::core::PCWSTR(window_name.as_ptr())) {
+            Ok(hwnd) => {
+                log::info!("找到窗口 (通过标题): {:?}", hwnd);
+                toggle_window_visibility(hwnd);
+                return;
+            },
+            Err(e) => {
+                log::warn!("通过标题查找窗口失败: {:?}", e);
+            },
+        }
+
+        // 方式2：枚举所有窗口，查找标题包含 "WeRun" 的窗口
+        log::info!("尝试枚举窗口查找...");
+
+        let mut enum_data = EnumData { found_hwnd: None };
+
+        let _ = EnumWindows(Some(enum_windows_callback), LPARAM(&mut enum_data as *mut _ as isize));
+
+        if let Some(hwnd) = enum_data.found_hwnd {
+            log::info!("找到窗口 (通过枚举): {:?}", hwnd);
+            toggle_window_visibility(hwnd);
+            return;
+        }
+
+        log::warn!("未找到 WeRun 窗口");
+    }
+}
+
+/// 切换窗口可见性
+unsafe fn toggle_window_visibility(hwnd: windows::Win32::Foundation::HWND) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        IsWindowVisible, SetForegroundWindow, ShowWindow, SW_HIDE, SW_SHOW,
+    };
+
+    // 检查窗口是否可见
+    if IsWindowVisible(hwnd).as_bool() {
+        log::info!("窗口当前可见，执行隐藏");
+        let _ = ShowWindow(hwnd, SW_HIDE);
+    } else {
+        log::info!("窗口当前隐藏，执行显示");
+        let _ = ShowWindow(hwnd, SW_SHOW);
+        // 激活窗口
+        let _ = SetForegroundWindow(hwnd);
+    }
+}
+
+/// 枚举窗口回调函数
+unsafe extern "system" fn enum_windows_callback(
+    hwnd: windows::Win32::Foundation::HWND,
+    lparam: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::BOOL {
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowTextW;
+
+    let data = &mut *(lparam.0 as *mut EnumData);
+
+    // 获取窗口文本
+    let mut text: [u16; 256] = [0; 256];
+    let len = GetWindowTextW(hwnd, &mut text);
+
+    if len > 0 {
+        let window_text = String::from_utf16_lossy(&text[..len as usize]);
+
+        // 检查窗口标题是否包含 "WeRun"
+        if window_text.contains("WeRun") {
+            log::info!("找到匹配的窗口: {}", window_text);
+            data.found_hwnd = Some(hwnd);
+            return windows::Win32::Foundation::BOOL(0); // 停止枚举
+        }
+    }
+
+    windows::Win32::Foundation::BOOL(1) // 继续枚举
 }

@@ -23,6 +23,7 @@ actions!(ui, [
     Open,
     Quit,
     ToggleSearch,
+    ToggleLauncher,
     TestAction,
     Tab,
     TabPrev,
@@ -58,6 +59,8 @@ pub fn init(cx: &mut App) {
         KeyBinding::new("cmd-q", Quit, None),
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("alt-f4", Quit, None),
+        // Alt+Space 切换启动器窗口显示/隐藏
+        KeyBinding::new("alt-space", ToggleLauncher, None),
     ]);
 
     cx.on_action(|_: &Quit, cx: &mut App| {
@@ -80,7 +83,112 @@ pub fn init(cx: &mut App) {
         }
     });
 
+    cx.on_action(|_: &ToggleLauncher, _cx: &mut App| {
+        log::info!("ToggleLauncher 动作被触发");
+        // 使用 Windows API 切换窗口
+        toggle_launcher_window();
+    });
+
     cx.activate(true);
+}
+
+/// 切换窗口显示/隐藏（使用 Windows API）
+fn toggle_launcher_window() {
+    log::info!("请求切换窗口状态");
+
+    // 使用 Windows API 直接操作窗口
+    use windows::Win32::{
+        Foundation::LPARAM,
+        UI::WindowsAndMessaging::{EnumWindows, FindWindowW},
+    };
+
+    unsafe {
+        // 尝试多种方式查找窗口
+
+        // 方式1：通过窗口标题查找
+        let window_name: Vec<u16> = "WeRun".encode_utf16().chain(std::iter::once(0)).collect();
+        log::info!("尝试查找窗口标题: WeRun");
+
+        match FindWindowW(None, windows::core::PCWSTR(window_name.as_ptr())) {
+            Ok(hwnd) => {
+                log::info!("找到窗口 (通过标题): {:?}", hwnd);
+                toggle_window_visibility(hwnd);
+                return;
+            },
+            Err(e) => {
+                log::warn!("通过标题查找窗口失败: {:?}", e);
+            },
+        }
+
+        // 方式2：枚举所有窗口，查找标题包含 "WeRun" 的窗口
+        log::info!("尝试枚举窗口查找...");
+
+        let mut enum_data = EnumData { found_hwnd: None };
+
+        let _ = EnumWindows(Some(enum_windows_callback), LPARAM(&mut enum_data as *mut _ as isize));
+
+        if let Some(hwnd) = enum_data.found_hwnd {
+            log::info!("找到窗口 (通过枚举): {:?}", hwnd);
+            toggle_window_visibility(hwnd);
+            return;
+        }
+
+        log::warn!("未找到 WeRun 窗口");
+    }
+}
+
+/// 枚举窗口数据结构
+struct EnumData {
+    found_hwnd: Option<windows::Win32::Foundation::HWND>,
+}
+
+/// 切换窗口可见性
+unsafe fn toggle_window_visibility(hwnd: windows::Win32::Foundation::HWND) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, IsWindowVisible, SetForegroundWindow, ShowWindow, SW_HIDE, SW_RESTORE,
+    };
+
+    // 检查窗口是否可见
+    if IsWindowVisible(hwnd).as_bool() {
+        log::info!("窗口当前可见，执行隐藏");
+        let _ = ShowWindow(hwnd, SW_HIDE);
+    } else {
+        log::info!("窗口当前隐藏，执行显示");
+        // 使用 SW_RESTORE 恢复窗口（比 SW_SHOW 更可靠）
+        let _ = ShowWindow(hwnd, SW_RESTORE);
+        // 将窗口带到最前面
+        let _ = BringWindowToTop(hwnd);
+        // 设置前景窗口
+        let _ = SetForegroundWindow(hwnd);
+        log::info!("窗口已显示并激活");
+    }
+}
+
+/// 枚举窗口回调函数
+unsafe extern "system" fn enum_windows_callback(
+    hwnd: windows::Win32::Foundation::HWND,
+    lparam: windows::Win32::Foundation::LPARAM,
+) -> windows::Win32::Foundation::BOOL {
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowTextW;
+
+    let data = &mut *(lparam.0 as *mut EnumData);
+
+    // 获取窗口文本
+    let mut text: [u16; 256] = [0; 256];
+    let len = GetWindowTextW(hwnd, &mut text);
+
+    if len > 0 {
+        let window_text = String::from_utf16_lossy(&text[..len as usize]);
+
+        // 检查窗口标题是否包含 "WeRun"
+        if window_text.contains("WeRun") {
+            log::info!("找到匹配的窗口: {}", window_text);
+            data.found_hwnd = Some(hwnd);
+            return windows::Win32::Foundation::BOOL(0); // 停止枚举
+        }
+    }
+
+    windows::Win32::Foundation::BOOL(1) // 继续枚举
 }
 
 pub fn create_new_window<F, E>(title: &str, crate_view_fn: F, cx: &mut App)
@@ -125,7 +233,11 @@ pub fn create_new_window_with_size<F, E>(
             traffic_light_position: None,
         }),
         window_background: WindowBackgroundAppearance::Transparent,
-        kind: WindowKind::PopUp,
+        kind: WindowKind::Normal, // 使用 Normal 类型以在任务栏显示图标
+        #[cfg(target_os = "linux")]
+        window_background: gpui::WindowBackgroundAppearance::Transparent,
+        #[cfg(target_os = "linux")]
+        window_decorations: Some(gpui::WindowDecorations::Client),
         display_id: None,
         window_min_size: Some(size(px(600.0), px(400.0))),
         focus: true,

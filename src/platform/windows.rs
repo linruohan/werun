@@ -163,10 +163,25 @@ impl GlobalHotkeyManager {
         unsafe {
             let mut msg: MSG = std::mem::zeroed();
 
-            while GetMessageW(&mut msg, None, 0, 0).into() {
+            log::info!("消息循环启动");
+
+            loop {
+                let result = GetMessageW(&mut msg, None, 0, 0);
+                // GetMessageW 返回 0 表示收到 WM_QUIT，负数表示错误
+                if result.0 == 0 {
+                    log::info!("收到 WM_QUIT，消息循环结束");
+                    break;
+                }
+                if result.0 < 0 {
+                    log::error!("GetMessageW 失败");
+                    break;
+                }
+
                 let _ = TranslateMessage(&msg);
                 DispatchMessageW(&msg);
             }
+
+            log::info!("消息循环已退出");
         }
     }
 }
