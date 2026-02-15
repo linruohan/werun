@@ -3,9 +3,11 @@ use std::sync::Arc;
 /// 启动器主窗口
 ///
 /// 包含搜索栏、结果列表和预览面板的完整界面
-use gpui::prelude::FluentBuilder;
 use gpui::*;
-use gpui_component::{ActiveTheme, Icon, IconName};
+use gpui_component::{
+    input::{Input, InputEvent, InputState},
+    ActiveTheme, Icon, IconName,
+};
 
 use crate::{
     core::{
@@ -21,8 +23,8 @@ use crate::{
 
 /// 启动器窗口状态
 pub struct LauncherWindow {
-    /// 搜索查询
-    search_query: SharedString,
+    /// 搜索输入状态
+    search_state: Entity<InputState>,
     /// 搜索结果
     results: Vec<SearchResult>,
     /// 当前选中索引
@@ -31,11 +33,13 @@ pub struct LauncherWindow {
     plugin_manager: Arc<PluginManager>,
     /// 剪贴板管理器
     clipboard_manager: ClipboardManager,
+    /// 输入事件订阅
+    _subscription: Subscription,
 }
 
 impl LauncherWindow {
     /// 创建新的启动器窗口
-    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // 初始化插件管理器
         let mut plugin_manager = Self::init_plugins();
 
@@ -44,12 +48,26 @@ impl LauncherWindow {
             log::error!("初始化插件失败: {:?}", e);
         }
 
+        // 创建搜索输入状态
+        let search_state =
+            cx.new(|cx| InputState::new(window, cx).placeholder("搜索应用、文件、命令..."));
+
+        // 订阅输入事件
+        let subscription = cx.subscribe_in(
+            &search_state,
+            window,
+            |this, _state, event: &InputEvent, _window, cx| {
+                this.on_input_event(event, cx);
+            },
+        );
+
         Self {
-            search_query: SharedString::default(),
+            search_state,
             results: Vec::new(),
             selected_index: 0,
             plugin_manager: Arc::new(plugin_manager),
             clipboard_manager: ClipboardManager::new(),
+            _subscription: subscription,
         }
     }
 
@@ -80,8 +98,6 @@ impl LauncherWindow {
     /// 处理搜索输入变化
     fn on_search_change(&mut self, query: String, cx: &mut Context<Self>) {
         log::debug!("搜索查询: {}", query);
-
-        self.search_query = query.clone().into();
 
         // 执行搜索
         if !query.is_empty() {
@@ -127,24 +143,7 @@ impl LauncherWindow {
                 // 关闭窗口
                 cx.emit(DismissEvent);
             },
-            "backspace" => {
-                // 退格键删除最后一个字符
-                let mut query = self.search_query.to_string();
-                if !query.is_empty() {
-                    query.pop();
-                    self.on_search_change(query, cx);
-                }
-            },
-            _ => {
-                // 处理普通字符输入
-                if let Some(ch) = event.keystroke.key.chars().next() {
-                    if ch.is_alphanumeric() || ch.is_whitespace() || ch.is_ascii_punctuation() {
-                        let mut query = self.search_query.to_string();
-                        query.push(ch);
-                        self.on_search_change(query, cx);
-                    }
-                }
-            },
+            _ => {},
         }
     }
 
@@ -187,19 +186,29 @@ impl LauncherWindow {
         }
     }
 
-    /// 清除搜索
-    fn clear_search(&mut self, cx: &mut Context<Self>) {
-        self.search_query = SharedString::default();
-        self.results.clear();
-        self.selected_index = 0;
-        cx.notify();
+    /// 处理输入事件
+    fn on_input_event(&mut self, event: &InputEvent, cx: &mut Context<Self>) {
+        match event {
+            InputEvent::Change => {
+                let query = self.search_state.read(cx).value().to_string();
+                self.on_search_change(query, cx);
+            },
+            InputEvent::PressEnter { .. } => {
+                // 执行选中的结果
+                if let Some(result) = self.results.get(self.selected_index) {
+                    log::info!("执行: {:?}", result);
+                    self.execute_result(result);
+                    cx.emit(DismissEvent);
+                }
+            },
+            _ => {},
+        }
     }
 }
 
 impl Render for LauncherWindow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
-        let has_query = !self.search_query.is_empty();
 
         div()
             .size_full()
@@ -229,32 +238,7 @@ impl Render for LauncherWindow {
                     .border_color(theme.border)
                     .bg(theme.secondary)
                     .child(Icon::new(IconName::Search).text_color(theme.muted_foreground))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_1()
-                            .child(
-                                if self.search_query.is_empty() {
-                                    div()
-                                        .text_color(theme.muted_foreground)
-                                        .child("搜索应用、文件、命令...")
-                                } else {
-                                    div()
-                                        .text_color(theme.foreground)
-                                        .child(self.search_query.clone())
-                                }
-                            ),
-                    )
-                    .when(has_query, |this| {
-                        this.child(
-                            div()
-                                .cursor_pointer()
-                                .child(Icon::new(IconName::Close).text_color(theme.muted_foreground))
-                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _event, _window, cx| {
-                                    this.clear_search(cx);
-                                })),
-                        )
-                    }),
+                    .child(Input::new(&self.search_state).cleanable(true).flex_1()),
             )
             // 分隔线
             .child(div().h_px().w_full().bg(theme.border))
