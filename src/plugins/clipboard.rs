@@ -3,6 +3,7 @@
 /// 管理剪贴板历史记录
 use crate::core::plugin::Plugin;
 use crate::core::search::{ActionData, ResultType, SearchResult};
+use crate::utils::clipboard::ClipboardManager;
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
 
@@ -27,6 +28,8 @@ pub struct ClipboardPlugin {
     history: Arc<Mutex<Vec<ClipboardEntry>>>,
     /// 最大历史数量
     max_history: usize,
+    /// 剪贴板管理器
+    clipboard_manager: ClipboardManager,
 }
 
 impl ClipboardPlugin {
@@ -36,6 +39,7 @@ impl ClipboardPlugin {
             enabled: true,
             history: Arc::new(Mutex::new(Vec::new())),
             max_history: 100,
+            clipboard_manager: ClipboardManager::new(),
         }
     }
 
@@ -98,6 +102,11 @@ impl ClipboardPlugin {
             format!("{} 天前", diff.num_days())
         }
     }
+
+    /// 复制文本到剪贴板
+    fn copy_to_clipboard(&self, text: &str) -> Result<()> {
+        self.clipboard_manager.set_text(text)
+    }
 }
 
 impl Plugin for ClipboardPlugin {
@@ -128,8 +137,12 @@ impl Plugin for ClipboardPlugin {
     fn initialize(&mut self) -> Result<()> {
         log::info!("初始化剪贴板历史插件...");
 
-        // TODO: 从文件加载历史记录
-        // TODO: 启动剪贴板监听
+        // 尝试读取当前剪贴板内容
+        if let Ok(text) = self.clipboard_manager.get_text() {
+            if !text.is_empty() {
+                self.add_entry(text);
+            }
+        }
 
         Ok(())
     }
@@ -184,8 +197,8 @@ impl Plugin for ClipboardPlugin {
 
     fn execute(&self, result: &SearchResult) -> Result<()> {
         if let ActionData::CopyToClipboard { text } = &result.action {
-            // TODO: 复制到剪贴板
-            log::info!("粘贴剪贴板内容: {}", text);
+            self.copy_to_clipboard(text)?;
+            log::info!("已复制到剪贴板: {}", text);
         }
         Ok(())
     }

@@ -2,14 +2,17 @@
 ///
 /// 包含搜索栏、结果列表和预览面板的完整界面
 use gpui::*;
+use gpui_component::Icon;
+use gpui_component::IconName;
 use std::sync::Arc;
 
 use crate::core::plugin::PluginManager;
-use crate::core::search::{SearchEngine, SearchResult};
+use crate::core::search::{ResultType, SearchEngine, SearchResult};
 use crate::plugins::app_launcher::AppLauncherPlugin;
 use crate::plugins::calculator::CalculatorPlugin;
 use crate::plugins::clipboard::ClipboardPlugin;
 use crate::plugins::file_search::FileSearchPlugin;
+use crate::utils::clipboard::ClipboardManager;
 
 /// 启动器窗口状态
 pub struct LauncherWindow {
@@ -23,6 +26,8 @@ pub struct LauncherWindow {
     search_engine: SearchEngine,
     /// 插件管理器
     plugin_manager: Arc<PluginManager>,
+    /// 剪贴板管理器
+    clipboard_manager: ClipboardManager,
 }
 
 impl LauncherWindow {
@@ -37,6 +42,7 @@ impl LauncherWindow {
             selected_index: 0,
             search_engine: SearchEngine::new(),
             plugin_manager: Arc::new(plugin_manager),
+            clipboard_manager: ClipboardManager::new(),
         }
     }
 
@@ -157,7 +163,9 @@ impl LauncherWindow {
             }
             crate::core::search::ActionData::CopyToClipboard { text } => {
                 log::info!("复制到剪贴板: {}", text);
-                // TODO: 实现剪贴板操作
+                if let Err(e) = self.clipboard_manager.set_text(text) {
+                    log::error!("复制到剪贴板失败: {:?}", e);
+                }
             }
             crate::core::search::ActionData::OpenUrl { url } => {
                 log::info!("打开 URL: {}", url);
@@ -195,7 +203,7 @@ impl Render for LauncherWindow {
                     .py_2()
                     .rounded_lg()
                     .border_1()
-                    .child("🔍")
+                    .child(Icon::new(IconName::Search))
                     .child(div().flex().flex_1().child("搜索输入框")),
             )
             // 分隔线
@@ -227,6 +235,20 @@ impl Render for LauncherWindow {
     }
 }
 
+/// 获取结果类型的图标
+fn get_result_icon(result_type: &ResultType) -> IconName {
+    match result_type {
+        ResultType::Application => IconName::AppWindow,
+        ResultType::File => IconName::File,
+        ResultType::Folder => IconName::Folder,
+        ResultType::Command => IconName::Terminal,
+        ResultType::Calculator => IconName::Calculator,
+        ResultType::Clipboard => IconName::Clipboard,
+        ResultType::Settings => IconName::Settings2,
+        ResultType::Custom(_) => IconName::FileBox,
+    }
+}
+
 /// 渲染结果项
 fn render_result_item(result: &SearchResult, is_selected: bool) -> impl IntoElement {
     let bg_color = if is_selected {
@@ -242,15 +264,17 @@ fn render_result_item(result: &SearchResult, is_selected: bool) -> impl IntoElem
     };
 
     let type_name = match &result.result_type {
-        crate::core::search::ResultType::Application => "应用",
-        crate::core::search::ResultType::File => "文件",
-        crate::core::search::ResultType::Folder => "文件夹",
-        crate::core::search::ResultType::Command => "命令",
-        crate::core::search::ResultType::Calculator => "计算",
-        crate::core::search::ResultType::Clipboard => "剪贴板",
-        crate::core::search::ResultType::Settings => "设置",
-        crate::core::search::ResultType::Custom(_) => "其他",
+        ResultType::Application => "应用",
+        ResultType::File => "文件",
+        ResultType::Folder => "文件夹",
+        ResultType::Command => "命令",
+        ResultType::Calculator => "计算",
+        ResultType::Clipboard => "剪贴板",
+        ResultType::Settings => "设置",
+        ResultType::Custom(_) => "其他",
     };
+
+    let icon = get_result_icon(&result.result_type);
 
     div()
         .flex()
@@ -271,7 +295,7 @@ fn render_result_item(result: &SearchResult, is_selected: bool) -> impl IntoElem
                 .h_8()
                 .rounded_md()
                 .bg(gpui::rgb(0x313244))
-                .child("📦"),
+                .child(Icon::new(icon)),
         )
         .child(
             div()

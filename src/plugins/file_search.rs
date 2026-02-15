@@ -3,6 +3,7 @@
 /// 提供文件搜索功能
 use crate::core::plugin::Plugin;
 use crate::core::search::{ActionData, ResultType, SearchResult};
+use crate::utils::fuzzy::fuzzy_match;
 use anyhow::Result;
 use std::sync::{Arc, Mutex};
 
@@ -29,6 +30,10 @@ pub struct FileSearchPlugin {
     files: Arc<Mutex<Vec<FileInfo>>>,
     /// 搜索路径
     search_paths: Vec<String>,
+    /// 忽略的目录
+    ignore_dirs: Vec<String>,
+    /// 最大递归深度
+    max_depth: usize,
 }
 
 impl FileSearchPlugin {
@@ -46,10 +51,22 @@ impl FileSearchPlugin {
                 .unwrap_or_default(),
         ];
 
+        let ignore_dirs = vec![
+            "node_modules".to_string(),
+            ".git".to_string(),
+            "target".to_string(),
+            "dist".to_string(),
+            "build".to_string(),
+            ".idea".to_string(),
+            ".vscode".to_string(),
+        ];
+
         Self {
             enabled: true,
             files: Arc::new(Mutex::new(Vec::new())),
             search_paths,
+            ignore_dirs,
+            max_depth: 3,
         }
     }
 
@@ -60,7 +77,7 @@ impl FileSearchPlugin {
         for path_str in &self.search_paths {
             let path = std::path::Path::new(path_str);
             if path.exists() {
-                self.scan_directory(path, &mut files, 2)?; // 限制递归深度
+                self.scan_directory(path, &mut files, self.max_depth)?;
             }
         }
 
@@ -81,6 +98,15 @@ impl FileSearchPlugin {
         if let Ok(entries) = std::fs::read_dir(path) {
             for entry in entries.flatten() {
                 let path = entry.path();
+
+                // 检查是否应该忽略
+                if let Some(name) = path.file_name() {
+                    let name_str = name.to_string_lossy().to_string();
+                    if self.ignore_dirs.contains(&name_str) {
+                        continue;
+                    }
+                }
+
                 let metadata = entry.metadata().ok();
 
                 let name = path
@@ -96,7 +122,7 @@ impl FileSearchPlugin {
                     .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
 
                 files.push(FileInfo {
-                    name,
+                    name: name.clone(),
                     path: path.to_string_lossy().to_string(),
                     size,
                     is_dir,
@@ -184,8 +210,10 @@ impl Plugin for FileSearchPlugin {
         let mut results = Vec::new();
 
         for file in files.iter() {
-            // 简单的模糊匹配
-            if file.name.to_lowercase().contains(&query.to_lowercase()) {
+            // 使用模糊匹配
+            let (matched, score) = fuzzy_match(query, &file.name);
+
+            if matched {
                 let result_type = if file.is_dir {
                     ResultType::Folder
                 } else {
@@ -204,7 +232,7 @@ impl Plugin for FileSearchPlugin {
                     description,
                     icon: None,
                     result_type,
-                    score: 80,
+                    score,
                     action: ActionData::OpenFile {
                         path: file.path.clone(),
                     },
@@ -215,6 +243,9 @@ impl Plugin for FileSearchPlugin {
                 }
             }
         }
+
+        // 按匹配分数排序
+        results.sort_by(|a, b| b.score.cmp(&a.score));
 
         Ok(results)
     }

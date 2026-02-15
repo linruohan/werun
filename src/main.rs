@@ -10,8 +10,7 @@ mod ui;
 mod utils;
 use app::LauncherApp;
 use gpui::{
-    px, size, App,
-    AppContext, Application, Bounds, Styled, TitlebarOptions,
+    px, size, App, AppContext, Application, Bounds, Styled, TitlebarOptions,
     WindowBackgroundAppearance, WindowBounds, WindowKind, WindowOptions,
 };
 use gpui_component_assets::Assets;
@@ -43,7 +42,7 @@ fn open_launcher_window(cx: &mut App) {
         window_bounds: Some(WindowBounds::Windowed(window_bounds)),
         titlebar: Some(TitlebarOptions {
             title: None,
-            appears_transparent: true,
+            appears_transparent: false,
             traffic_light_position: None,
         }),
         window_background: WindowBackgroundAppearance::Transparent,
