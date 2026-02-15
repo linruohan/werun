@@ -1,4 +1,4 @@
-use gpui::{actions, App};
+use gpui::{actions, App, Global};
 
 /// WeRun - Windows 启动器库
 ///
@@ -7,13 +7,13 @@ pub mod app;
 pub mod core;
 pub mod platform;
 pub mod plugins;
+pub mod themes;
 pub mod ui;
 pub mod utils;
-use core::themes;
 
 use gpui::KeyBinding;
 use gpui_component::Root;
-use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _};
+
 actions!(werun, [
     About,
     Open,
@@ -25,24 +25,26 @@ actions!(werun, [
     ShowPanelInfo,
     ToggleListActiveHighlight
 ]);
+
 /// 版本信息
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NAME: &str = env!("CARGO_PKG_NAME");
+
+/// 应用状态
 pub struct AppState {}
+
+impl Global for AppState {}
+
 impl AppState {
     fn init(cx: &mut App) {
         let state = Self {};
         cx.set_global::<AppState>(state);
     }
 }
+
 pub fn init(cx: &mut App) {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("werun=trace".parse().unwrap()),
-        )
-        .init();
+    // 只初始化 gpui_component，不初始化 tracing_subscriber
+    // 因为 main.rs 中已经初始化了 env_logger
     gpui_component::init(cx);
     AppState::init(cx);
     themes::init(cx);

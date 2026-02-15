@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use gpui::prelude::FluentBuilder;
 /// 启动器主窗口
 ///
 /// 包含搜索栏、结果列表和预览面板的完整界面
@@ -30,6 +31,8 @@ pub struct LauncherWindow {
     plugin_manager: Arc<PluginManager>,
     /// 剪贴板管理器
     clipboard_manager: ClipboardManager,
+    /// 是否聚焦在搜索框
+    search_focused: bool,
 }
 
 impl LauncherWindow {
@@ -49,6 +52,7 @@ impl LauncherWindow {
             selected_index: 0,
             plugin_manager: Arc::new(plugin_manager),
             clipboard_manager: ClipboardManager::new(),
+            search_focused: true,
         }
     }
 
@@ -123,7 +127,24 @@ impl LauncherWindow {
                 // 关闭窗口
                 cx.emit(DismissEvent);
             },
-            _ => {},
+            "backspace" => {
+                // 退格键删除最后一个字符
+                let mut query = self.search_query.to_string();
+                if !query.is_empty() {
+                    query.pop();
+                    self.on_search_change(query, cx);
+                }
+            },
+            _ => {
+                // 处理普通字符输入
+                if let Some(ch) = event.keystroke.key.chars().next() {
+                    if ch.is_alphanumeric() || ch.is_whitespace() || ch.is_ascii_punctuation() {
+                        let mut query = self.search_query.to_string();
+                        query.push(ch);
+                        self.on_search_change(query, cx);
+                    }
+                }
+            },
         }
     }
 
@@ -165,11 +186,20 @@ impl LauncherWindow {
             }
         }
     }
+
+    /// 清除搜索
+    fn clear_search(&mut self, cx: &mut Context<Self>) {
+        self.search_query = SharedString::default();
+        self.results.clear();
+        self.selected_index = 0;
+        cx.notify();
+    }
 }
 
 impl Render for LauncherWindow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+        let has_query = !self.search_query.is_empty();
 
         div()
             .size_full()
@@ -196,10 +226,35 @@ impl Render for LauncherWindow {
                     .py_2()
                     .rounded_lg()
                     .border_1()
-                    .border_color(theme.border)
+                    .border_color(if self.search_focused { theme.accent } else { theme.border })
                     .bg(theme.secondary)
                     .child(Icon::new(IconName::Search).text_color(theme.muted_foreground))
-                    .child(div().flex().flex_1().child(self.search_query.clone())),
+                    .child(
+                        div()
+                            .flex()
+                            .flex_1()
+                            .child(
+                                if self.search_query.is_empty() {
+                                    div()
+                                        .text_color(theme.muted_foreground)
+                                        .child("搜索应用、文件、命令...")
+                                } else {
+                                    div()
+                                        .text_color(theme.foreground)
+                                        .child(self.search_query.clone())
+                                }
+                            ),
+                    )
+                    .when(has_query, |this| {
+                        this.child(
+                            div()
+                                .cursor_pointer()
+                                .child(Icon::new(IconName::Close).text_color(theme.muted_foreground))
+                                .on_mouse_down(MouseButton::Left, cx.listener(|this, _event, _window, cx| {
+                                    this.clear_search(cx);
+                                })),
+                        )
+                    }),
             )
             // 分隔线
             .child(div().h_px().w_full().bg(theme.border))

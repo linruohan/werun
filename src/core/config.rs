@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use gpui::App;
 /// 管理启动器的所有配置项
 use serde::{Deserialize, Serialize};
 

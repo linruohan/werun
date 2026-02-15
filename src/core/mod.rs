@@ -4,4 +4,3 @@
 pub mod config;
 pub mod plugin;
 pub mod search;
-pub mod themes;
