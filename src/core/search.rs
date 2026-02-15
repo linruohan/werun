@@ -20,6 +20,62 @@ pub struct SearchResult {
     pub score: u32,
     /// 动作数据
     pub action: ActionData,
+    /// 高亮显示的标题（包含匹配标记）
+    pub highlighted_title: Option<String>,
+    /// 高亮显示的描述（包含匹配标记）
+    pub highlighted_description: Option<String>,
+}
+
+impl SearchResult {
+    /// 创建新的搜索结果
+    pub fn new(
+        id: String,
+        title: String,
+        description: String,
+        result_type: ResultType,
+        score: u32,
+        action: ActionData,
+    ) -> Self {
+        Self {
+            id,
+            title,
+            description,
+            icon: None,
+            result_type,
+            score,
+            action,
+            highlighted_title: None,
+            highlighted_description: None,
+        }
+    }
+
+    /// 设置高亮显示的标题
+    pub fn with_highlighted_title(mut self, highlighted: String) -> Self {
+        self.highlighted_title = Some(highlighted);
+        self
+    }
+
+    /// 设置高亮显示的描述
+    pub fn with_highlighted_description(mut self, highlighted: String) -> Self {
+        self.highlighted_description = Some(highlighted);
+        self
+    }
+
+    /// 设置图标
+    pub fn with_icon(mut self, icon: Option<String>) -> Self {
+        self.icon = icon;
+        self
+    }
+
+    /// 获取显示的标题（优先使用高亮版本）
+    pub fn display_title(&self) -> &str {
+        self.highlighted_title.as_deref().unwrap_or(&self.title)
+    }
+
+    /// 获取显示的描述（优先使用高亮版本）
+    pub fn display_description(&self) -> &str {
+        self.highlighted_description.as_deref().unwrap_or(&self.description)
+    }
 }
 
 /// 结果类型

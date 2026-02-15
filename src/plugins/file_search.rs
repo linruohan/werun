@@ -218,15 +218,14 @@ impl Plugin for FileSearchPlugin {
                     format!("文件 · {}", self.format_size(file.size))
                 };
 
-                results.push(SearchResult {
-                    id: format!("file:{}", file.path),
-                    title: file.name.clone(),
+                results.push(SearchResult::new(
+                    format!("file:{}", file.path),
+                    file.name.clone(),
                     description,
-                    icon: None,
                     result_type,
                     score,
-                    action: ActionData::OpenFile { path: file.path.clone() },
-                });
+                    ActionData::OpenFile { path: file.path.clone() },
+                ));
 
                 if results.len() >= limit {
                     break;

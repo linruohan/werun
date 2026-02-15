@@ -152,15 +152,14 @@ impl Plugin for CalculatorPlugin {
             if let Some(value) = self.evaluate(query) {
                 let result_str = self.format_result(value);
 
-                results.push(SearchResult {
-                    id: format!("calc:{}", query),
-                    title: format!("{} = {}", query, result_str),
-                    description: "按 Enter 复制结果".to_string(),
-                    icon: None,
-                    result_type: ResultType::Calculator,
-                    score: 1000, // 计算器结果优先级很高
-                    action: ActionData::CopyToClipboard { text: result_str },
-                });
+                results.push(SearchResult::new(
+                    format!("calc:{}", query),
+                    format!("{} = {}", query, result_str),
+                    "按 Enter 复制结果".to_string(),
+                    ResultType::Calculator,
+                    1000, // 计算器结果优先级很高
+                    ActionData::CopyToClipboard { text: result_str },
+                ));
             }
         }
 

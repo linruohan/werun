@@ -3,6 +3,7 @@ use std::sync::Arc;
 /// 启动器主窗口
 ///
 /// 包含搜索栏、结果列表和预览面板的完整界面
+use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::{
     input::{Input, InputEvent, InputState},
@@ -101,7 +102,20 @@ impl LauncherWindow {
 
         // 执行搜索
         if !query.is_empty() {
-            self.results = self.plugin_manager.search_all(&query, 50);
+            let mut results = self.plugin_manager.search_all(&query, 50);
+
+            // 为结果添加高亮
+            for result in &mut results {
+                let highlighted_title =
+                    crate::utils::fuzzy::highlight_matches(&query, &result.title);
+                result.highlighted_title = Some(highlighted_title);
+
+                let highlighted_desc =
+                    crate::utils::fuzzy::highlight_matches(&query, &result.description);
+                result.highlighted_description = Some(highlighted_desc);
+            }
+
+            self.results = results;
         } else {
             self.results.clear();
         }
@@ -250,7 +264,7 @@ impl Render for LauncherWindow {
                     .gap_1()
                     .children(self.results.iter().enumerate().map(|(index, result)| {
                         let is_selected = index == self.selected_index;
-                        render_result_item(result, is_selected, theme)
+                        render_result_item(result, is_selected, &theme)
                     })),
             )
             // 底部状态栏
@@ -284,6 +298,91 @@ fn get_result_icon(result_type: &ResultType) -> IconName {
     }
 }
 
+/// 解析高亮文本，返回普通文本和高亮文本的片段
+fn parse_highlighted_text(text: &str) -> Vec<(String, bool)> {
+    let mut fragments = Vec::new();
+    let mut current_text = String::new();
+    let mut in_bracket = false;
+
+    for ch in text.chars() {
+        match ch {
+            '[' => {
+                if !current_text.is_empty() {
+                    fragments.push((current_text.clone(), false));
+                    current_text.clear();
+                }
+                in_bracket = true;
+            },
+            ']' => {
+                if !current_text.is_empty() {
+                    fragments.push((current_text.clone(), true));
+                    current_text.clear();
+                }
+                in_bracket = false;
+            },
+            _ => {
+                current_text.push(ch);
+            },
+        }
+    }
+
+    // 添加剩余的文本
+    if !current_text.is_empty() {
+        fragments.push((current_text, in_bracket));
+    }
+
+    fragments
+}
+
+/// 渲染高亮文本
+///
+/// 样式规则：
+/// - 未选中：匹配字符橙色 + 粗体
+/// - 选中：匹配字符橙色 + 浅蓝边框 + 粗体
+fn render_highlighted_text(
+    text: &str,
+    theme: &gpui_component::Theme,
+    is_selected: bool,
+    is_title: bool,
+) -> impl IntoElement {
+    let fragments = parse_highlighted_text(text);
+
+    // 橙色 - 使用主题中的 warning 颜色（通常是橙色/黄色）
+    let orange_color = theme.warning;
+
+    // 基础颜色
+    let base_color = if is_selected {
+        theme.accent_foreground
+    } else if is_title {
+        theme.foreground
+    } else {
+        theme.muted_foreground
+    };
+
+    div().flex().flex_row().children(fragments.into_iter().map(move |(text, is_highlighted)| {
+        let mut div_element = div()
+            .text_color(if is_highlighted { orange_color } else { base_color })
+            .font_weight(if is_highlighted { FontWeight::BOLD } else { FontWeight::NORMAL });
+
+        if is_highlighted {
+            if is_selected {
+                // 选中状态：橙色 + 浅蓝边框 + 粗体
+                div_element = div_element
+                    .border_1()
+                    .border_color(theme.primary.opacity(0.5))
+                    .rounded_sm()
+                    .px_1()
+                    .py_0();
+            } else {
+                // 未选中状态：橙色 + 粗体（无边框）
+                div_element = div_element.px_1();
+            }
+        }
+
+        div_element.child(text)
+    }))
+}
+
 /// 渲染结果项
 fn render_result_item(
     result: &SearchResult,
@@ -293,8 +392,6 @@ fn render_result_item(
     let bg_color = if is_selected { theme.accent } else { theme.background };
 
     let text_color = if is_selected { theme.accent_foreground } else { theme.foreground };
-
-    let muted_color = if is_selected { theme.accent_foreground } else { theme.muted_foreground };
 
     let type_name = match &result.result_type {
         ResultType::Application => "应用",
@@ -336,14 +433,18 @@ fn render_result_item(
                 .flex_col()
                 .flex_1()
                 .gap_1()
-                .child(
-                    div()
-                        .text_sm()
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(text_color)
-                        .child(result.title.clone()),
-                )
-                .child(div().text_xs().text_color(muted_color).child(result.description.clone())),
+                .child(div().text_sm().child(render_highlighted_text(
+                    result.display_title(),
+                    theme,
+                    is_selected,
+                    true, // 是标题
+                )))
+                .child(div().text_xs().child(render_highlighted_text(
+                    result.display_description(),
+                    theme,
+                    is_selected,
+                    false, // 是描述
+                ))),
         )
         .child(
             div()
@@ -352,7 +453,7 @@ fn render_result_item(
                 .rounded_full()
                 .text_xs()
                 .bg(if is_selected { theme.accent_foreground } else { theme.secondary })
-                .text_color(muted_color)
+                .text_color(if is_selected { theme.accent } else { theme.muted_foreground })
                 .child(type_name),
         )
 }

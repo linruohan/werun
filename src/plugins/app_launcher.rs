@@ -171,15 +171,17 @@ impl Plugin for AppLauncherPlugin {
         for app in apps.iter() {
             // 简单的模糊匹配
             if app.name.to_lowercase().contains(&query.to_lowercase()) {
-                results.push(SearchResult {
-                    id: format!("app:{}", app.path),
-                    title: app.name.clone(),
-                    description: app.description.clone(),
-                    icon: app.icon.clone(),
-                    result_type: ResultType::Application,
-                    score: 100, // TODO: 实现更好的评分算法
-                    action: ActionData::LaunchApp { path: app.path.clone(), args: Vec::new() },
-                });
+                results.push(
+                    SearchResult::new(
+                        format!("app:{}", app.path),
+                        app.name.clone(),
+                        app.description.clone(),
+                        ResultType::Application,
+                        100, // TODO: 实现更好的评分算法
+                        ActionData::LaunchApp { path: app.path.clone(), args: Vec::new() },
+                    )
+                    .with_icon(app.icon.clone()),
+                );
 
                 if results.len() >= limit {
                     break;

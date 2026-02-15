@@ -151,32 +151,27 @@ impl Plugin for ClipboardPlugin {
         // 如果查询为空，显示最近的历史
         if query.is_empty() {
             for entry in history.iter().take(limit) {
-                results.push(SearchResult {
-                    id: entry.id.clone(),
-                    title: entry.preview.clone(),
-                    description: format!("{} · 按 Enter 粘贴", self.format_time(&entry.timestamp)),
-                    icon: None,
-                    result_type: ResultType::Clipboard,
-                    score: 0, // 按时间排序
-                    action: ActionData::CopyToClipboard { text: entry.text.clone() },
-                });
+                results.push(SearchResult::new(
+                    entry.id.clone(),
+                    entry.preview.clone(),
+                    format!("{} · 按 Enter 粘贴", self.format_time(&entry.timestamp)),
+                    ResultType::Clipboard,
+                    0, // 按时间排序
+                    ActionData::CopyToClipboard { text: entry.text.clone() },
+                ));
             }
         } else {
             // 搜索历史
             for entry in history {
                 if entry.text.to_lowercase().contains(&query.to_lowercase()) {
-                    results.push(SearchResult {
-                        id: entry.id.clone(),
-                        title: entry.preview.clone(),
-                        description: format!(
-                            "{} · 按 Enter 粘贴",
-                            self.format_time(&entry.timestamp)
-                        ),
-                        icon: None,
-                        result_type: ResultType::Clipboard,
-                        score: 50, // 中等优先级
-                        action: ActionData::CopyToClipboard { text: entry.text.clone() },
-                    });
+                    results.push(SearchResult::new(
+                        entry.id.clone(),
+                        entry.preview.clone(),
+                        format!("{} · 按 Enter 粘贴", self.format_time(&entry.timestamp)),
+                        ResultType::Clipboard,
+                        50, // 中等优先级
+                        ActionData::CopyToClipboard { text: entry.text.clone() },
+                    ));
 
                     if results.len() >= limit {
                         break;

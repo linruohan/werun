@@ -149,15 +149,17 @@ impl Plugin for WebSearchPlugin {
         if !search_query.is_empty() {
             if let Some(engine) = self.get_engine(engine_id) {
                 if let Some(url) = self.build_search_url(engine_id, search_query) {
-                    results.push(SearchResult {
-                        id: format!("web_search:{}:{}", engine_id, search_query),
-                        title: format!("在 {} 搜索 \"{}\"", engine.name, search_query),
-                        description: format!("使用 {} 搜索 \"{}\"", engine.name, search_query),
-                        icon: engine.icon.clone(),
-                        result_type: ResultType::Command,
-                        score: 80, // 较高的优先级
-                        action: ActionData::OpenUrl { url },
-                    });
+                    results.push(
+                        SearchResult::new(
+                            format!("web_search:{}:{}", engine_id, search_query),
+                            format!("在 {} 搜索 \"{}\"", engine.name, search_query),
+                            format!("使用 {} 搜索 \"{}\"", engine.name, search_query),
+                            ResultType::Command,
+                            80, // 较高的优先级
+                            ActionData::OpenUrl { url },
+                        )
+                        .with_icon(engine.icon.clone()),
+                    );
                 }
             }
         }
@@ -167,15 +169,17 @@ impl Plugin for WebSearchPlugin {
             for engine in &self.engines {
                 if engine.id != engine_id {
                     if let Some(url) = self.build_search_url(&engine.id, query) {
-                        results.push(SearchResult {
-                            id: format!("web_search:{}:{}", engine.id, query),
-                            title: format!("在 {} 搜索 \"{}\"", engine.name, query),
-                            description: format!("使用 {} 搜索 \"{}\"", engine.name, query),
-                            icon: engine.icon.clone(),
-                            result_type: ResultType::Command,
-                            score: 70,
-                            action: ActionData::OpenUrl { url },
-                        });
+                        results.push(
+                            SearchResult::new(
+                                format!("web_search:{}:{}", engine.id, query),
+                                format!("在 {} 搜索 \"{}\"", engine.name, query),
+                                format!("使用 {} 搜索 \"{}\"", engine.name, query),
+                                ResultType::Command,
+                                70,
+                                ActionData::OpenUrl { url },
+                            )
+                            .with_icon(engine.icon.clone()),
+                        );
 
                         if results.len() >= limit {
                             break;
