@@ -79,6 +79,9 @@ lnk = "0.5"
 # 数学表达式解析
 eval = "0.4"
 
+# URL 编码
+urlencoding = "2.1"
+
 
 [lints.clippy]
 almost_complete_range = "allow"

@@ -21,6 +21,10 @@ impl LauncherApp {
 
         Self { window_view }
     }
+
+    pub fn view(window: &mut Window, cx: &mut App) -> Entity<Self> {
+        cx.new(|cx| Self::new(window, cx))
+    }
 }
 
 impl Render for LauncherApp {

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use gpui::prelude::FluentBuilder;
 /// 启动器主窗口
 ///
 /// 包含搜索栏、结果列表和预览面板的完整界面
+use gpui::prelude::FluentBuilder;
 use gpui::*;
-use gpui_component::{theme::ActiveTheme, Icon, IconName};
+use gpui_component::{ActiveTheme, Icon, IconName};
 
 use crate::{
     core::{
@@ -14,7 +14,7 @@ use crate::{
     },
     plugins::{
         app_launcher::AppLauncherPlugin, calculator::CalculatorPlugin, clipboard::ClipboardPlugin,
-        file_search::FileSearchPlugin,
+        file_search::FileSearchPlugin, web_search::WebSearchPlugin,
     },
     utils::clipboard::ClipboardManager,
 };
@@ -31,8 +31,6 @@ pub struct LauncherWindow {
     plugin_manager: Arc<PluginManager>,
     /// 剪贴板管理器
     clipboard_manager: ClipboardManager,
-    /// 是否聚焦在搜索框
-    search_focused: bool,
 }
 
 impl LauncherWindow {
@@ -52,7 +50,6 @@ impl LauncherWindow {
             selected_index: 0,
             plugin_manager: Arc::new(plugin_manager),
             clipboard_manager: ClipboardManager::new(),
-            search_focused: true,
         }
     }
 
@@ -71,6 +68,9 @@ impl LauncherWindow {
 
         // 注册文件搜索插件
         manager.register(FileSearchPlugin::new());
+
+        // 注册网页搜索插件
+        manager.register(WebSearchPlugin::new());
 
         log::info!("已注册 {} 个插件", manager.plugin_count());
 
@@ -226,7 +226,7 @@ impl Render for LauncherWindow {
                     .py_2()
                     .rounded_lg()
                     .border_1()
-                    .border_color(if self.search_focused { theme.accent } else { theme.border })
+                    .border_color(theme.border)
                     .bg(theme.secondary)
                     .child(Icon::new(IconName::Search).text_color(theme.muted_foreground))
                     .child(

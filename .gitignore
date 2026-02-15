@@ -1,1 +1,9 @@
-/target
+target/
+.DS_Store
+/docks.json
+/profile.json
+.vscode
+index.scip
+*.log
+/.idea
+node_modules/
