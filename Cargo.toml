@@ -82,6 +82,10 @@ eval = "0.4"
 # URL 编码
 urlencoding = "2.1"
 
+# Windows 资源编译 (build-dependency)
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"
+
 
 [lints.clippy]
 almost_complete_range = "allow"
