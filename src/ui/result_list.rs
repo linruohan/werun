@@ -62,7 +62,13 @@ impl ResultListDelegate {
                 if query.is_empty() {
                     Vec::new()
                 } else {
-                    manager.search_plugin(plugin_id, query, 50)
+                    // 去掉 / 前缀
+                    let search_query = query.trim_start_matches('/').trim();
+                    if search_query.is_empty() {
+                        Vec::new()
+                    } else {
+                        manager.search_plugin(plugin_id, search_query, 50)
+                    }
                 }
             } else if query.starts_with('/') {
                 Self::handle_plugin_command_static(&manager, query)

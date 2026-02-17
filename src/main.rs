@@ -27,8 +27,8 @@ struct EnumData {
 static mut HOTKEY_MANAGER: Option<Box<platform::windows::GlobalHotkeyManager>> = None;
 
 fn main() {
-    // 初始化日志
-    env_logger::init();
+    // 初始化日志（默认设置为 info 级别）
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     log::info!("WeRun 启动器初始化...");
     log::info!("配置目录: {:?}", dirs::config_dir());
