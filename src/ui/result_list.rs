@@ -13,11 +13,18 @@ pub struct ResultListDelegate {
     pub selected_index: Option<usize>,
     search_query: String,
     plugin_manager: Option<Arc<PluginManager>>,
+    active_plugin_id: Option<String>,
 }
 
 impl ResultListDelegate {
     pub fn new(items: Vec<SearchResult>) -> Self {
-        Self { items, selected_index: None, search_query: String::new(), plugin_manager: None }
+        Self {
+            items,
+            selected_index: None,
+            search_query: String::new(),
+            plugin_manager: None,
+            active_plugin_id: None,
+        }
     }
 
     pub fn with_plugin_manager(mut self, manager: Arc<PluginManager>) -> Self {
@@ -43,10 +50,27 @@ impl ResultListDelegate {
         self.selected_index = None;
     }
 
+    pub fn set_active_plugin(&mut self, plugin_id: Option<String>) {
+        self.active_plugin_id = plugin_id;
+    }
+
     fn perform_search_internal(&mut self, query: &str) {
         if let Some(manager) = &self.plugin_manager {
-            let mut results = manager.search_all(query, 50);
+            let manager = manager.clone();
 
+            let results = if let Some(ref plugin_id) = self.active_plugin_id {
+                if query.is_empty() {
+                    Vec::new()
+                } else {
+                    manager.search_plugin(plugin_id, query, 50)
+                }
+            } else if query.starts_with('/') {
+                Self::handle_plugin_command_static(&manager, query)
+            } else {
+                manager.search_all(query, 50)
+            };
+
+            let mut results = results;
             for result in &mut results {
                 let highlighted_title =
                     crate::utils::fuzzy::highlight_matches(query, &result.title);
@@ -60,6 +84,55 @@ impl ResultListDelegate {
             self.items = results;
             self.selected_index = None;
         }
+    }
+
+    fn handle_plugin_command_static(
+        manager: &Arc<PluginManager>,
+        query: &str,
+    ) -> Vec<SearchResult> {
+        let query = query.trim_start_matches('/');
+
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        let parts: Vec<&str> = query.splitn(2, ' ').collect();
+        let plugin_prefix = parts[0];
+        let search_term = parts.get(1).map(|s| *s).unwrap_or("");
+
+        if search_term.is_empty() {
+            let matches = manager.match_plugin_ids(plugin_prefix);
+            matches
+                .into_iter()
+                .map(|id| {
+                    SearchResult::new(
+                        format!("__plugin__:{}", id),
+                        format!("/{} ", id),
+                        "按 Enter 选择此插件，然后输入搜索内容".to_string(),
+                        ResultType::Custom("plugin".to_string()),
+                        1000,
+                        crate::core::search::ActionData::Custom {
+                            plugin: "plugin_selector".to_string(),
+                            data: id,
+                        },
+                    )
+                })
+                .collect()
+        } else {
+            manager.search_plugin(plugin_prefix, search_term, 50)
+        }
+    }
+
+    pub fn select_plugin(&mut self, plugin_id: &str) {
+        self.active_plugin_id = Some(plugin_id.to_string());
+    }
+
+    pub fn get_active_plugin(&self) -> Option<&String> {
+        self.active_plugin_id.as_ref()
+    }
+
+    pub fn clear_active_plugin(&mut self) {
+        self.active_plugin_id = None;
     }
 }
 

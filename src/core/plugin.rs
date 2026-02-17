@@ -105,6 +105,45 @@ impl PluginManager {
         results
     }
 
+    /// 搜索指定插件
+    pub fn search_plugin(&self, plugin_id: &str, query: &str, limit: usize) -> Vec<SearchResult> {
+        for plugin in &self.plugins {
+            if let Ok(guard) = plugin.lock() {
+                if guard.id() == plugin_id && guard.is_enabled() {
+                    match guard.search(query, limit) {
+                        Ok(results) => return results,
+                        Err(e) => {
+                            log::error!("插件 {} 搜索失败: {:?}", guard.name(), e);
+                        },
+                    }
+                }
+            }
+        }
+        Vec::new()
+    }
+
+    /// 获取所有插件ID列表
+    pub fn get_plugin_ids(&self) -> Vec<String> {
+        let mut ids = Vec::new();
+        for plugin in &self.plugins {
+            if let Ok(guard) = plugin.lock() {
+                if guard.is_enabled() {
+                    ids.push(guard.id().to_string());
+                }
+            }
+        }
+        ids
+    }
+
+    /// 根据前缀模糊匹配插件ID
+    pub fn match_plugin_ids(&self, prefix: &str) -> Vec<String> {
+        let prefix_lower = prefix.to_lowercase();
+        self.get_plugin_ids()
+            .into_iter()
+            .filter(|id| id.to_lowercase().starts_with(&prefix_lower))
+            .collect()
+    }
+
     /// 执行结果
     pub fn execute(&self, result: &SearchResult) -> Result<()> {
         // 根据 ID 前缀找到对应的插件
