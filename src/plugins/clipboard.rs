@@ -56,7 +56,7 @@ impl ClipboardPlugin {
         let preview = if text.len() > 100 { format!("{}...", &text[..100]) } else { text.clone() };
 
         let entry = ClipboardEntry {
-            id: format!("clip:{}", chrono::Local::now().timestamp_millis()),
+            id: format!("clipboard:{}", chrono::Local::now().timestamp_millis()),
             text: text.clone(),
             timestamp: chrono::Local::now(),
             preview,

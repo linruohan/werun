@@ -1,3 +1,4 @@
+use config::{Config, File, FileFormat};
 use std::path::PathBuf;
 
 /// 管理启动器的所有配置项
@@ -23,28 +24,30 @@ impl AppConfig {
     pub fn load() -> anyhow::Result<Self> {
         let config_path = Self::config_path();
 
+        let mut settings = Config::builder();
+
         if config_path.exists() {
-            let content = std::fs::read_to_string(&config_path)?;
-            let config: AppConfig = serde_json::from_str(&content)?;
-            Ok(config)
-        } else {
-            // 创建默认配置
-            let config = Self::default();
-            config.save()?;
-            Ok(config)
+            settings = settings.add_source(File::new(
+                config_path.to_str().unwrap_or("config.toml"),
+                FileFormat::Toml,
+            ));
         }
+
+        let config: AppConfig = settings.build()?.try_deserialize()?;
+
+        // 如果配置文件不存在，保存默认配置
+        if !config_path.exists() {
+            config.save()?;
+        }
+
+        Ok(config)
     }
 
     /// 保存配置文件
     pub fn save(&self) -> anyhow::Result<()> {
         let config_path = Self::config_path();
 
-        // 确保配置目录存在
-        if let Some(parent) = config_path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-
-        let content = serde_json::to_string_pretty(self)?;
+        let content = toml::to_string_pretty(self)?;
         std::fs::write(&config_path, content)?;
 
         Ok(())
@@ -52,8 +55,7 @@ impl AppConfig {
 
     /// 获取配置文件路径
     fn config_path() -> PathBuf {
-        let app_data = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-        app_data.join("werun").join("config.json")
+        PathBuf::from(".").join("config.toml")
     }
 }
 

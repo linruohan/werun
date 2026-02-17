@@ -1,12 +1,9 @@
 use std::sync::Arc;
 
-/// 启动器主窗口
-///
-/// 包含搜索栏、结果列表和预览面板的完整界面
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::{
-    input::{Input, InputEvent, InputState},
+    list::{List, ListEvent, ListState},
     ActiveTheme, Icon, IconName,
 };
 
@@ -17,25 +14,26 @@ use crate::{
     },
     plugins::{
         app_launcher::AppLauncherPlugin, calculator::CalculatorPlugin, clipboard::ClipboardPlugin,
-        file_search::FileSearchPlugin, web_search::WebSearchPlugin,
+        color_picker::ColorPickerPlugin, custom_commands::CustomCommandsPlugin,
+        file_search::FileSearchPlugin, system_commands::SystemCommandsPlugin,
+        web_search::WebSearchPlugin, window_switcher::WindowSwitcherPlugin,
     },
+    ui::result_list::ResultListDelegate,
     utils::clipboard::ClipboardManager,
 };
 
 /// 启动器窗口状态
 pub struct LauncherWindow {
-    /// 搜索输入状态
-    search_state: Entity<InputState>,
-    /// 搜索结果
-    results: Vec<SearchResult>,
-    /// 当前选中索引
-    selected_index: usize,
+    /// 列表状态
+    list_state: Entity<ListState<ResultListDelegate>>,
     /// 插件管理器
     plugin_manager: Arc<PluginManager>,
     /// 剪贴板管理器
     clipboard_manager: ClipboardManager,
-    /// 输入事件订阅
-    _subscription: Subscription,
+    /// 列表事件订阅
+    _list_subscription: Subscription,
+    /// 快捷键配置
+    keybindings: crate::core::config::KeybindingsConfig,
 }
 
 impl LauncherWindow {
@@ -49,26 +47,27 @@ impl LauncherWindow {
             log::error!("初始化插件失败: {:?}", e);
         }
 
-        // 创建搜索输入状态
-        let search_state =
-            cx.new(|cx| InputState::new(window, cx).placeholder("搜索应用、文件、命令..."));
+        // 创建列表委托和状态（启用搜索功能）
+        let plugin_manager = Arc::new(plugin_manager);
+        let delegate =
+            ResultListDelegate::new(Vec::new()).with_plugin_manager(plugin_manager.clone());
+        let list_state = cx.new(|cx| ListState::new(delegate, window, cx).searchable(true));
 
-        // 订阅输入事件
-        let subscription = cx.subscribe_in(
-            &search_state,
-            window,
-            |this, _state, event: &InputEvent, _window, cx| {
-                this.on_input_event(event, cx);
-            },
-        );
+        // 订阅列表事件
+        let list_subscription =
+            cx.subscribe_in(&list_state, window, |this, _state, event: &ListEvent, _window, cx| {
+                this.on_list_event(event, cx);
+            });
+
+        // 加载快捷键配置
+        let keybindings = crate::core::config_manager::global_config().get_config().keybindings;
 
         Self {
-            search_state,
-            results: Vec::new(),
-            selected_index: 0,
-            plugin_manager: Arc::new(plugin_manager),
+            list_state,
+            plugin_manager,
             clipboard_manager: ClipboardManager::new(),
-            _subscription: subscription,
+            _list_subscription: list_subscription,
+            keybindings,
         }
     }
 
@@ -91,6 +90,18 @@ impl LauncherWindow {
         // 注册网页搜索插件
         manager.register(WebSearchPlugin::new());
 
+        // 注册系统命令插件
+        manager.register(SystemCommandsPlugin::new());
+
+        // 注册自定义命令插件
+        manager.register(CustomCommandsPlugin::new());
+
+        // 注册颜色选择器插件
+        manager.register(ColorPickerPlugin::new());
+
+        // 注册窗口切换器插件
+        manager.register(WindowSwitcherPlugin::new());
+
         log::info!("已注册 {} 个插件", manager.plugin_count());
 
         manager
@@ -101,7 +112,7 @@ impl LauncherWindow {
         log::debug!("搜索查询: {}", query);
 
         // 执行搜索
-        if !query.is_empty() {
+        let results = if !query.is_empty() {
             let mut results = self.plugin_manager.search_all(&query, 50);
 
             // 为结果添加高亮
@@ -115,49 +126,45 @@ impl LauncherWindow {
                 result.highlighted_description = Some(highlighted_desc);
             }
 
-            self.results = results;
+            results
         } else {
-            self.results.clear();
+            Vec::new()
+        };
+
+        // 更新列表状态
+        self.list_state.update(cx, |state, cx| {
+            state.delegate_mut().update_from_search(results);
+            cx.notify();
+        });
+    }
+
+    /// 处理列表事件
+    fn on_list_event(&mut self, event: &ListEvent, cx: &mut Context<Self>) {
+        match event {
+            ListEvent::Confirm(ix) => {
+                // 用户确认选择
+                let delegate = self.list_state.read(cx).delegate();
+                if let Some(result) = delegate.get_item(ix.row) {
+                    log::info!("确认执行: {:?}", result);
+                    self.execute_result(result);
+                    cx.emit(DismissEvent);
+                }
+            },
+            ListEvent::Cancel => {
+                // 取消选择，关闭窗口
+                cx.emit(DismissEvent);
+            },
+            _ => {},
         }
-
-        // 清空选中索引
-        self.selected_index = 0;
-
-        // 通知 UI 更新
-        cx.notify();
     }
 
     /// 处理键盘事件
     fn handle_key_event(&mut self, event: &KeyDownEvent, cx: &mut Context<Self>) {
-        match event.keystroke.key.as_str() {
-            "arrowdown" => {
-                // 向下导航
-                if !self.results.is_empty() {
-                    self.selected_index = (self.selected_index + 1).min(self.results.len() - 1);
-                    cx.notify();
-                }
-            },
-            "arrowup" => {
-                // 向上导航
-                if self.selected_index > 0 {
-                    self.selected_index -= 1;
-                    cx.notify();
-                }
-            },
-            "enter" => {
-                // 确认执行
-                if let Some(result) = self.results.get(self.selected_index) {
-                    log::info!("执行: {:?}", result);
-                    self.execute_result(result);
-                    // 执行后关闭窗口
-                    cx.emit(DismissEvent);
-                }
-            },
-            "escape" => {
-                // 关闭窗口
-                cx.emit(DismissEvent);
-            },
-            _ => {},
+        let key = event.keystroke.key.as_str();
+
+        // 只处理 Escape 键关闭，List 组件内置上下导航
+        if key == self.keybindings.close.to_lowercase().as_str() || key == "escape" {
+            cx.emit(DismissEvent);
         }
     }
 
@@ -199,30 +206,14 @@ impl LauncherWindow {
             }
         }
     }
-
-    /// 处理输入事件
-    fn on_input_event(&mut self, event: &InputEvent, cx: &mut Context<Self>) {
-        match event {
-            InputEvent::Change => {
-                let query = self.search_state.read(cx).value().to_string();
-                self.on_search_change(query, cx);
-            },
-            InputEvent::PressEnter { .. } => {
-                // 执行选中的结果
-                if let Some(result) = self.results.get(self.selected_index) {
-                    log::info!("执行: {:?}", result);
-                    self.execute_result(result);
-                    cx.emit(DismissEvent);
-                }
-            },
-            _ => {},
-        }
-    }
 }
 
 impl Render for LauncherWindow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
+
+        // 获取列表中的结果数量
+        let results_count = self.list_state.read(cx).delegate().items_count();
 
         div()
             .size_full()
@@ -238,35 +229,8 @@ impl Render for LauncherWindow {
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
                 this.handle_key_event(event, cx);
             }))
-            // 搜索输入
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .gap_2()
-                    .px_3()
-                    .py_2()
-                    .rounded_lg()
-                    .border_1()
-                    .border_color(theme.border)
-                    .bg(theme.secondary)
-                    .child(Icon::new(IconName::Search).text_color(theme.muted_foreground))
-                    .child(Input::new(&self.search_state).cleanable(true).flex_1()),
-            )
-            // 分隔线
-            .child(div().h_px().w_full().bg(theme.border))
-            // 结果列表
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .children(self.results.iter().enumerate().map(|(index, result)| {
-                        let is_selected = index == self.selected_index;
-                        render_result_item(result, is_selected, &theme)
-                    })),
-            )
+            // 使用 List 组件（内置搜索功能）
+            .child(List::new(&self.list_state).max_h(px(400.)).p_1())
             // 底部状态栏
             .child(
                 div()
@@ -278,7 +242,7 @@ impl Render for LauncherWindow {
                     .py_1()
                     .text_sm()
                     .text_color(theme.muted_foreground)
-                    .child(format!("{} 个结果", self.results.len()))
+                    .child(format!("{} 个结果", results_count))
                     .child("↑↓ 选择 · ↵ 执行 · Esc 关闭"),
             )
     }

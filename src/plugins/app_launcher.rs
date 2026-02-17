@@ -173,7 +173,7 @@ impl Plugin for AppLauncherPlugin {
             if app.name.to_lowercase().contains(&query.to_lowercase()) {
                 results.push(
                     SearchResult::new(
-                        format!("app:{}", app.path),
+                        format!("app_launcher:{}", app.path),
                         app.name.clone(),
                         app.description.clone(),
                         ResultType::Application,

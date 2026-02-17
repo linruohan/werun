@@ -1,0 +1,40 @@
+[window]
+width = 800.0
+height = 500.0
+opacity = 0.9800000190734863
+border_radius = 12.0
+always_on_top = true
+hide_on_blur = true
+animation_duration_ms = 150
+
+[theme]
+current_theme = "dark"
+follow_system = true
+
+[search]
+max_results = 50
+debounce_ms = 50
+enable_file_search = true
+file_search_paths = []
+file_ignore_patterns = [
+    "*.tmp",
+    "*.log",
+    "node_modules",
+    ".git",
+]
+
+[keybindings]
+toggle_launcher = "Alt+Space"
+navigate_up = "ArrowUp"
+navigate_down = "ArrowDown"
+confirm = "Enter"
+close = "Escape"
+
+[plugins]
+enabled = [
+    "app_launcher",
+    "calculator",
+    "clipboard",
+]
+
+[plugins.settings]

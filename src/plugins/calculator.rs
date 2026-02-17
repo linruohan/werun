@@ -153,7 +153,7 @@ impl Plugin for CalculatorPlugin {
                 let result_str = self.format_result(value);
 
                 results.push(SearchResult::new(
-                    format!("calc:{}", query),
+                    format!("calculator:{}", query),
                     format!("{} = {}", query, result_str),
                     "按 Enter 复制结果".to_string(),
                     ResultType::Calculator,

@@ -2,6 +2,8 @@
 ///
 /// 提供启动器的所有用户界面组件
 pub mod launcher_window;
+pub mod result_item;
+pub mod result_list;
 pub mod themes;
 use gpui::{
     actions, div, px, size, Action, AnyView, App, AppContext, Bounds, Context, FocusHandle,
@@ -18,18 +20,21 @@ use crate::core::config_manager::global_config;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NAME: &str = env!("CARGO_PKG_NAME");
 
-actions!(ui, [
-    About,
-    Open,
-    Quit,
-    ToggleSearch,
-    ToggleLauncher,
-    TestAction,
-    Tab,
-    TabPrev,
-    ShowPanelInfo,
-    ToggleListActiveHighlight
-]);
+actions!(
+    ui,
+    [
+        About,
+        Open,
+        Quit,
+        ToggleSearch,
+        ToggleLauncher,
+        TestAction,
+        Tab,
+        TabPrev,
+        ShowPanelInfo,
+        ToggleListActiveHighlight
+    ]
+);
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
 #[action(namespace = ui, no_json)]
 pub struct SelectScrollbarShow(ScrollbarShow);
@@ -49,6 +54,10 @@ pub struct SelectRadius(usize);
 pub fn init(cx: &mut App) {
     gpui_component::init(cx);
     themes::init(cx);
+
+    // 从配置中读取快捷键
+    let config = global_config().get_config();
+
     cx.bind_keys([
         KeyBinding::new("/", ToggleSearch, None),
         #[cfg(target_os = "macos")]
@@ -59,8 +68,10 @@ pub fn init(cx: &mut App) {
         KeyBinding::new("cmd-q", Quit, None),
         #[cfg(not(target_os = "macos"))]
         KeyBinding::new("alt-f4", Quit, None),
-        // Alt+Space 切换启动器窗口显示/隐藏
-        KeyBinding::new("alt-space", ToggleLauncher, None),
+        // 从配置中读取的快捷键
+        KeyBinding::new(&config.keybindings.toggle_launcher.to_lowercase(), ToggleLauncher, None),
+        // ToggleListActiveHighlight
+        KeyBinding::new("ctrl-h", ToggleListActiveHighlight, None),
     ]);
 
     cx.on_action(|_: &Quit, cx: &mut App| {
@@ -87,6 +98,41 @@ pub fn init(cx: &mut App) {
         log::info!("ToggleLauncher 动作被触发");
         // 使用 Windows API 切换窗口
         toggle_launcher_window();
+    });
+
+    cx.on_action(|_: &Open, cx: &mut App| {
+        log::info!("Open 动作被触发");
+        // 打开文件选择对话框
+        open_file_dialog(cx);
+    });
+
+    cx.on_action(|_: &TestAction, cx: &mut App| {
+        log::info!("TestAction 动作被触发");
+        // 显示测试通知
+        if let Some(window) = cx.active_window().and_then(|w| w.downcast::<Root>()) {
+            cx.defer(move |cx| {
+                window
+                    .update(cx, |root, window, cx| {
+                        root.push_notification("测试动作触发成功！\n这是一个测试通知", window, cx);
+                    })
+                    .unwrap();
+            });
+        }
+    });
+
+    cx.on_action(|_: &Tab, _cx: &mut App| {
+        log::info!("Tab 动作被触发");
+        // 模拟 Tab 键按下，向下导航
+    });
+
+    cx.on_action(|_: &TabPrev, _cx: &mut App| {
+        log::info!("TabPrev 动作被触发");
+        // 模拟 Shift+Tab 键按下，向上导航
+    });
+
+    cx.on_action(|_: &ToggleListActiveHighlight, _cx: &mut App| {
+        log::info!("ToggleListActiveHighlight 动作被触发");
+        // 通知所有窗口切换高亮状态
     });
 
     cx.activate(true);
@@ -189,6 +235,23 @@ unsafe extern "system" fn enum_windows_callback(
     }
 
     windows::Win32::Foundation::BOOL(1) // 继续枚举
+}
+
+/// 打开文件选择对话框 (暂时禁用)
+#[allow(unused)]
+fn open_file_dialog(cx: &mut App) {
+    log::warn!("文件选择对话框功能暂时禁用");
+}
+
+/// 打开文件
+fn open_file(path: &str) {
+    log::info!("打开文件: {}", path);
+
+    #[cfg(target_os = "windows")]
+    {
+        // 使用 Windows 命令打开文件
+        let _ = std::process::Command::new("explorer").arg(path).spawn();
+    }
 }
 
 pub fn create_new_window<F, E>(title: &str, crate_view_fn: F, cx: &mut App)

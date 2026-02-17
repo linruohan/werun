@@ -1,13 +1,11 @@
+use crate::core::search::{ResultType, SearchResult};
 /// 结果项组件
-/// 
+///
 /// 显示单个搜索结果
-
 use gpui::*;
-use gpui_component::prelude::*;
 use gpui_component::theme::ActiveTheme;
 use gpui_component::IconName;
-
-use crate::core::search::{ResultType, SearchResult};
+use gpui_component::Sizable;
 
 /// 结果项视图
 pub struct ResultItemView {
@@ -20,10 +18,7 @@ pub struct ResultItemView {
 impl ResultItemView {
     /// 创建新的结果项视图
     pub fn new(result: SearchResult, is_selected: bool) -> Self {
-        Self {
-            result,
-            is_selected,
-        }
+        Self { result, is_selected }
     }
 
     /// 获取结果类型的显示名称
@@ -56,28 +51,20 @@ impl ResultItemView {
 }
 
 impl RenderOnce for ResultItemView {
-    fn render(self, _window: &mut Window, cx: &mut AppContext) -> impl IntoElement {
-        let theme = cx.theme();
-        
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let theme = cx.theme().clone();
+
         // 根据选中状态设置样式
-        let bg_color = if self.is_selected {
-            theme.accent
-        } else {
-            theme.background
-        };
-        
-        let text_color = if self.is_selected {
-            theme.accent_foreground
-        } else {
-            theme.foreground
-        };
-        
+        let bg_color = if self.is_selected { theme.accent } else { theme.background };
+
+        let text_color = if self.is_selected { theme.accent_foreground } else { theme.foreground };
+
         let muted_color = if self.is_selected {
             theme.accent_foreground.opacity(0.7)
         } else {
             theme.muted_foreground
         };
-        
+
         div()
             .flex()
             .flex_row()
@@ -97,11 +84,11 @@ impl RenderOnce for ResultItemView {
                     .w_8()
                     .h_8()
                     .rounded_md()
-                    .bg(if self.is_selected {
-                        theme.accent_foreground.opacity(0.2)
-                    } else {
-                        theme.secondary
-                    })
+                      .bg(if self.is_selected {
+                            theme.accent_foreground.opacity(0.2)
+                        } else {
+                            theme.secondary
+                        })
                     .child(
                         gpui_component::Icon::new(self.type_icon())
                             .small()

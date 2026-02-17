@@ -219,7 +219,7 @@ impl Plugin for FileSearchPlugin {
                 };
 
                 results.push(SearchResult::new(
-                    format!("file:{}", file.path),
+                    format!("file_search:{}", file.path),
                     file.name.clone(),
                     description,
                     result_type,

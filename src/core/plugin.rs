@@ -110,7 +110,11 @@ impl PluginManager {
         // 根据 ID 前缀找到对应的插件
         for plugin in &self.plugins {
             if let Ok(guard) = plugin.lock() {
-                if result.id.starts_with(&format!("{}:", guard.id())) {
+                let plugin_id = guard.id();
+                // 支持两种匹配方式：
+                // 1. result.id 以 "plugin_id:" 开头
+                // 2. result.id 等于 plugin_id
+                if result.id.starts_with(&format!("{}:", plugin_id)) || result.id == plugin_id {
                     return guard.execute(result);
                 }
             }
