@@ -1,11 +1,10 @@
-use crate::core::search::{ResultType, SearchResult};
 /// 结果项组件
 ///
 /// 显示单个搜索结果
 use gpui::*;
-use gpui_component::theme::ActiveTheme;
-use gpui_component::IconName;
-use gpui_component::Sizable;
+use gpui_component::{theme::ActiveTheme, IconName, Sizable};
+
+use crate::core::search::{ResultType, SearchResult};
 
 /// 结果项视图
 pub struct ResultItemView {

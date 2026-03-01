@@ -1,7 +1,9 @@
 use anyhow::Result;
 
-use crate::core::plugin::Plugin;
-use crate::core::search::{ActionData, ResultType, SearchResult};
+use crate::core::{
+    plugin::Plugin,
+    search::{ActionData, ResultType, SearchResult},
+};
 
 #[derive(Clone, Debug)]
 pub struct SystemCommand {

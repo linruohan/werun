@@ -32,9 +32,10 @@ fn main() {
 
     log::info!("WeRun 启动器初始化...");
     log::info!("配置目录: {:?}", dirs::config_dir());
+    let app = gpui_platform::application().with_assets(Assets);
 
     // 启动 GPUI 应用
-    Application::new().with_assets(Assets).run(move |cx: &mut App| {
+    app.run(move |cx: &mut App| {
         // 初始化 werun
         ui::init(cx);
         // 激活应用

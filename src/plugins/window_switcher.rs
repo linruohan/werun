@@ -2,8 +2,10 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 
-use crate::core::plugin::Plugin;
-use crate::core::search::{ActionData, ResultType, SearchResult};
+use crate::core::{
+    plugin::Plugin,
+    search::{ActionData, ResultType, SearchResult},
+};
 
 #[derive(Clone, Debug)]
 pub struct WindowInfo {
@@ -35,11 +37,13 @@ impl WindowSwitcherPlugin {
 
     #[cfg(target_os = "windows")]
     fn enumerate_windows(&self) -> Vec<WindowInfo> {
-        use std::ffi::OsString;
-        use std::os::windows::ffi::OsStringExt;
-        use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
-        use windows::Win32::UI::WindowsAndMessaging::{
-            EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
+        use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+
+        use windows::Win32::{
+            Foundation::{BOOL, HWND, LPARAM},
+            UI::WindowsAndMessaging::{
+                EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
+            },
         };
 
         let _windows: Vec<WindowInfo> = Vec::new();
@@ -102,9 +106,9 @@ impl WindowSwitcherPlugin {
     fn switch_to_window(&self, hwnd: isize) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
-            use windows::Win32::Foundation::HWND;
-            use windows::Win32::UI::WindowsAndMessaging::{
-                SetForegroundWindow, ShowWindow, SW_RESTORE,
+            use windows::Win32::{
+                Foundation::HWND,
+                UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindow, SW_RESTORE},
             };
 
             unsafe {
@@ -118,9 +122,10 @@ impl WindowSwitcherPlugin {
     fn close_window(&self, hwnd: isize) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
-            use windows::Win32::Foundation::HWND;
-            use windows::Win32::UI::WindowsAndMessaging::PostMessageW;
-            use windows::Win32::UI::WindowsAndMessaging::WM_CLOSE;
+            use windows::Win32::{
+                Foundation::HWND,
+                UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE},
+            };
 
             unsafe {
                 let _ = PostMessageW(HWND(hwnd as *mut _), WM_CLOSE, None, None);
@@ -132,9 +137,10 @@ impl WindowSwitcherPlugin {
     fn minimize_window(&self, hwnd: isize) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
-            use windows::Win32::Foundation::HWND;
-            use windows::Win32::UI::WindowsAndMessaging::ShowWindow;
-            use windows::Win32::UI::WindowsAndMessaging::SW_MINIMIZE;
+            use windows::Win32::{
+                Foundation::HWND,
+                UI::WindowsAndMessaging::{ShowWindow, SW_MINIMIZE},
+            };
 
             unsafe {
                 let _ = ShowWindow(HWND(hwnd as *mut _), SW_MINIMIZE);
@@ -146,9 +152,10 @@ impl WindowSwitcherPlugin {
     fn maximize_window(&self, hwnd: isize) -> Result<()> {
         #[cfg(target_os = "windows")]
         {
-            use windows::Win32::Foundation::HWND;
-            use windows::Win32::UI::WindowsAndMessaging::ShowWindow;
-            use windows::Win32::UI::WindowsAndMessaging::SW_MAXIMIZE;
+            use windows::Win32::{
+                Foundation::HWND,
+                UI::WindowsAndMessaging::{ShowWindow, SW_MAXIMIZE},
+            };
 
             unsafe {
                 let _ = ShowWindow(HWND(hwnd as *mut _), SW_MAXIMIZE);

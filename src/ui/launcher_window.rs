@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-use gpui::prelude::FluentBuilder;
-use gpui::*;
+use gpui::{prelude::FluentBuilder, *};
 use gpui_component::{
     list::{List, ListEvent, ListState},
     ActiveTheme, Icon, IconName,
@@ -142,7 +141,7 @@ impl LauncherWindow {
     }
 
     /// 处理列表事件
-    fn on_list_event(&mut self, event: &ListEvent, window: &mut Window, cx: &mut Context<Self>) {
+    fn on_list_event(&mut self, event: &ListEvent, _window: &mut Window, cx: &mut Context<Self>) {
         match event {
             ListEvent::Confirm(ix) => {
                 let result_opt = {
@@ -159,7 +158,7 @@ impl LauncherWindow {
                             self.active_plugin_id = Some(plugin_id.clone());
 
                             // 更新 delegate 的活动插件
-                            self.list_state.update(cx, |state, cx| {
+                            self.list_state.update(cx, |state, _cx| {
                                 state.delegate_mut().set_active_plugin(Some(plugin_id.clone()));
                             });
 
@@ -320,7 +319,7 @@ impl LauncherWindow {
                         if let ActionData::Custom { plugin: _, data } = &result.action {
                             let plugin_id = data.clone();
                             self.active_plugin_id = Some(plugin_id.clone());
-                            self.list_state.update(cx, |state, cx| {
+                            self.list_state.update(cx, |state, _cx| {
                                 state.delegate_mut().set_active_plugin(Some(plugin_id.clone()));
                             });
                             log::info!("切换到插件: {}", plugin_id);

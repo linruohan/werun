@@ -8,7 +8,7 @@ rust-version = "1.81"
 # GPUI 核心框架 - Zed 编辑器团队开发的 GPU 加速 UI 框架
 # 使用 gpui-component 依赖的相同版本
 gpui = { git = "https://github.com/zed-industries/zed" }
-
+gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "x11", "wayland", "runtime_shaders"] }
 # gpui-component - 丰富的 UI 组件库
 gpui-macros = "0.2.2"
 gpui-component = { git = "https://github.com/linruohan/gpui-component.git" }

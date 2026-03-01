@@ -1,6 +1,6 @@
-use config::{Config, File, FileFormat};
 use std::path::PathBuf;
 
+use config::{Config, File, FileFormat};
 /// 管理启动器的所有配置项
 use serde::{Deserialize, Serialize};
 

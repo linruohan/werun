@@ -20,21 +20,18 @@ use crate::core::config_manager::global_config;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const NAME: &str = env!("CARGO_PKG_NAME");
 
-actions!(
-    ui,
-    [
-        About,
-        Open,
-        Quit,
-        ToggleSearch,
-        ToggleLauncher,
-        TestAction,
-        Tab,
-        TabPrev,
-        ShowPanelInfo,
-        ToggleListActiveHighlight
-    ]
-);
+actions!(ui, [
+    About,
+    Open,
+    Quit,
+    ToggleSearch,
+    ToggleLauncher,
+    TestAction,
+    Tab,
+    TabPrev,
+    ShowPanelInfo,
+    ToggleListActiveHighlight
+]);
 #[derive(Action, Clone, PartialEq, Eq, Deserialize)]
 #[action(namespace = ui, no_json)]
 pub struct SelectScrollbarShow(ScrollbarShow);

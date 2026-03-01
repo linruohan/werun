@@ -1,12 +1,16 @@
-use crate::core::plugin::PluginManager;
-use crate::core::search::{ResultType, SearchResult};
-use gpui::*;
-use gpui_component::list::{ListDelegate, ListItem, ListState};
-use gpui_component::theme::ActiveTheme;
-use gpui_component::IconName;
-use gpui_component::IndexPath;
-use gpui_component::Sizable;
 use std::sync::Arc;
+
+use gpui::*;
+use gpui_component::{
+    list::{ListDelegate, ListItem, ListState},
+    theme::ActiveTheme,
+    IconName, IndexPath, Sizable,
+};
+
+use crate::core::{
+    plugin::PluginManager,
+    search::{ResultType, SearchResult},
+};
 
 pub struct ResultListDelegate {
     pub items: Vec<SearchResult>,
