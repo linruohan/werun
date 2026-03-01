@@ -30,6 +30,8 @@ impl ResultItemView {
             ResultType::Calculator => "计算",
             ResultType::Clipboard => "剪贴板",
             ResultType::Settings => "设置",
+            ResultType::SystemCommand => "系统命令",
+            ResultType::Task => "任务",
             ResultType::Custom(_) => "其他",
         }
     }
@@ -44,6 +46,8 @@ impl ResultItemView {
             ResultType::Calculator => IconName::Calculator,
             ResultType::Clipboard => IconName::Clipboard,
             ResultType::Settings => IconName::Settings,
+            ResultType::SystemCommand => IconName::Command,
+            ResultType::Task => IconName::ListTodo,
             ResultType::Custom(_) => IconName::Box,
         }
     }

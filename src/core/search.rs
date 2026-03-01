@@ -95,6 +95,10 @@ pub enum ResultType {
     Clipboard,
     /// 系统设置
     Settings,
+    /// 系统命令
+    SystemCommand,
+    /// 任务
+    Task,
     /// 插件自定义类型
     Custom(String),
 }
@@ -112,6 +116,14 @@ pub enum ActionData {
     CopyToClipboard { text: String },
     /// 打开 URL
     OpenUrl { url: String },
+    /// 创建任务
+    CreateTask {
+        title: String,
+        description: String,
+        priority: crate::plugins::task_manager::TaskPriority,
+    },
+    /// 查看任务
+    ViewTask { task: crate::plugins::task_manager::Task },
     /// 自定义动作
     Custom { plugin: String, data: String },
 }

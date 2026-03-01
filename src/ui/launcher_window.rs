@@ -13,8 +13,9 @@ use crate::{
     },
     plugins::{
         app_launcher::AppLauncherPlugin, calculator::CalculatorPlugin, clipboard::ClipboardPlugin,
-        color_picker::ColorPickerPlugin, custom_commands::CustomCommandsPlugin,
-        file_search::FileSearchPlugin, system_commands::SystemCommandsPlugin,
+        color_picker::ColorPickerPlugin, command_executor::CommandExecutorPlugin,
+        custom_commands::CustomCommandsPlugin, file_search::FileSearchPlugin,
+        system_commands::SystemCommandsPlugin, task_manager::TaskManagerPlugin,
         web_search::WebSearchPlugin, window_switcher::WindowSwitcherPlugin,
     },
     ui::result_list::ResultListDelegate,
@@ -103,6 +104,12 @@ impl LauncherWindow {
 
         // 注册窗口切换器插件
         manager.register(WindowSwitcherPlugin::new());
+
+        // 注册命令执行器插件
+        manager.register(CommandExecutorPlugin::new());
+
+        // 注册任务管理器插件
+        manager.register(TaskManagerPlugin::new());
 
         log::info!("已注册 {} 个插件", manager.plugin_count());
 
@@ -262,6 +269,18 @@ impl LauncherWindow {
             return;
         }
 
+        // Tab 键切换插件（向前）
+        if key == "tab" && !event.keystroke.modifiers.shift {
+            self.switch_to_next_plugin(cx);
+            return;
+        }
+
+        // Shift+Tab 切换插件（向后）
+        if key == "tab" && event.keystroke.modifiers.shift {
+            self.switch_to_previous_plugin(cx);
+            return;
+        }
+
         let items_count = self.list_state.read(cx).delegate().items_count();
         if items_count == 0 {
             return;
@@ -333,6 +352,65 @@ impl LauncherWindow {
                 }
             }
         }
+    }
+
+    /// 切换到下一个插件
+    fn switch_to_next_plugin(&mut self, cx: &mut Context<Self>) {
+        let all_plugins = self.plugin_manager.get_plugin_ids();
+        if all_plugins.is_empty() {
+            return;
+        }
+
+        let next_plugin_id = if let Some(ref current_id) = self.active_plugin_id {
+            // 找到当前插件的索引
+            if let Some(current_idx) = all_plugins.iter().position(|id| id == current_id) {
+                // 下一个插件（循环）
+                let next_idx = (current_idx + 1) % all_plugins.len();
+                all_plugins[next_idx].clone()
+            } else {
+                all_plugins[0].clone()
+            }
+        } else {
+            all_plugins[0].clone()
+        };
+
+        // 更新活动插件
+        self.active_plugin_id = Some(next_plugin_id.clone());
+        self.list_state.update(cx, |state, _cx| {
+            state.delegate_mut().set_active_plugin(Some(next_plugin_id.clone()));
+        });
+
+        log::info!("切换到下一个插件：{}", next_plugin_id);
+    }
+
+    /// 切换到上一个插件
+    fn switch_to_previous_plugin(&mut self, cx: &mut Context<Self>) {
+        let all_plugins = self.plugin_manager.get_plugin_ids();
+        if all_plugins.is_empty() {
+            return;
+        }
+
+        let prev_plugin_id = if let Some(ref current_id) = self.active_plugin_id {
+            // 找到当前插件的索引
+            if let Some(current_idx) = all_plugins.iter().position(|id| id == current_id) {
+                // 上一个插件（循环）
+                let prev_idx =
+                    if current_idx == 0 { all_plugins.len() - 1 } else { current_idx - 1 };
+                all_plugins[prev_idx].clone()
+            } else {
+                all_plugins[0].clone()
+            }
+        } else {
+            all_plugins[0].clone()
+        };
+
+        // 更新活动插件
+        self.active_plugin_id = Some(prev_plugin_id.clone());
+        self.list_state.update(cx, |state, _cx| {
+            state.delegate_mut().set_active_plugin(Some(prev_plugin_id.clone()));
+        });
+
+        log::info!("切换到上一个插件：{}", prev_plugin_id);
     }
 
     /// 执行搜索结果
@@ -434,6 +512,8 @@ fn get_result_icon(result_type: &ResultType) -> IconName {
         ResultType::Calculator => IconName::Calculator,
         ResultType::Clipboard => IconName::Clipboard,
         ResultType::Settings => IconName::Settings2,
+        ResultType::SystemCommand => IconName::Command,
+        ResultType::Task => IconName::ListTodo,
         ResultType::Custom(_) => IconName::FileBox,
     }
 }
@@ -541,6 +621,8 @@ fn render_result_item(
         ResultType::Calculator => "计算",
         ResultType::Clipboard => "剪贴板",
         ResultType::Settings => "设置",
+        ResultType::SystemCommand => "系统命令",
+        ResultType::Task => "任务",
         ResultType::Custom(_) => "其他",
     };
 
