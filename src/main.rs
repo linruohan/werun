@@ -1,7 +1,9 @@
-/// WeRun - Windows 启动器
-///
-/// 使用 GPUI 开发的高性能启动器
-/// 灵感来源于 Vicinae
+//! WeRun - Windows 启动器
+//!
+//! 使用 GPUI 开发的高性能启动器
+//! 灵感来源于 Vicinae
+#![allow(clippy::disallowed_methods)]
+
 use gpui::*;
 
 mod app;

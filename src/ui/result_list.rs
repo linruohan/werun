@@ -108,7 +108,7 @@ impl ResultListDelegate {
 
         let parts: Vec<&str> = query.splitn(2, ' ').collect();
         let plugin_prefix = parts[0];
-        let search_term = parts.get(1).map(|s| *s).unwrap_or("");
+        let search_term = parts.get(1).copied().unwrap_or("");
 
         if search_term.is_empty() {
             let matches = manager.match_plugin_ids(plugin_prefix);

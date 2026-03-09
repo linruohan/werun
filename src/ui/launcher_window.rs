@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use gpui::{prelude::FluentBuilder, *};
+use gpui::*;
 use gpui_component::{
     list::{List, ListEvent, ListState},
     ActiveTheme, Icon, IconName,

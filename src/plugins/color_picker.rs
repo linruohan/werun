@@ -28,7 +28,7 @@ impl ColorPickerPlugin {
     fn parse_hex(&self, input: &str) -> Option<ColorValue> {
         let hex = input.trim().to_uppercase();
 
-        let hex = if hex.starts_with('#') { hex[1..].to_string() } else { hex };
+        let hex = if let Some(stripped) = hex.strip_prefix('#') { stripped.to_string() } else { hex };
 
         let hex = if hex.len() == 3 {
             let chars: Vec<char> = hex.chars().collect();
@@ -58,10 +58,8 @@ impl ColorPickerPlugin {
 
         let input = if input.starts_with("rgb(") && input.ends_with(')') {
             &input[4..input.len() - 1]
-        } else if input.starts_with("rgb") {
-            &input[3..]
         } else {
-            return None;
+            input.strip_prefix("rgb")?
         };
 
         let parts: Vec<&str> = input.split(',').map(|s| s.trim()).collect();
@@ -84,10 +82,8 @@ impl ColorPickerPlugin {
 
         let input = if input.starts_with("hsl(") && input.ends_with(')') {
             &input[4..input.len() - 1]
-        } else if input.starts_with("hsl") {
-            &input[3..]
         } else {
-            return None;
+            input.strip_prefix("hsl")?
         };
 
         let parts: Vec<&str> = input.split(',').map(|s| s.trim().trim_end_matches('%')).collect();

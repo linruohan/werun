@@ -1,10 +1,10 @@
 /// 模糊搜索工具
 ///
 /// 提供高性能的模糊匹配功能
-
+///
 /// 计算模糊匹配分数
 ///
-/// 返回 (是否匹配, 匹配分数)
+/// 返回 (是否匹配，匹配分数)
 /// 分数越高表示匹配度越好
 pub fn fuzzy_match(query: &str, target: &str) -> (bool, u32) {
     let query = query.to_lowercase();

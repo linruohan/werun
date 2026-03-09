@@ -129,18 +129,18 @@ impl Plugin for WebSearchPlugin {
         let mut results = Vec::new();
 
         // 如果查询以特定前缀开头，使用对应的搜索引擎
-        let (engine_id, search_query) = if query.starts_with("g ") {
-            ("google", &query[2..])
-        } else if query.starts_with("b ") {
-            ("bing", &query[2..])
-        } else if query.starts_with("bd ") {
-            ("baidu", &query[3..])
-        } else if query.starts_with("ddg ") {
-            ("duckduckgo", &query[4..])
-        } else if query.starts_with("gh ") {
-            ("github", &query[3..])
-        } else if query.starts_with("so ") {
-            ("stackoverflow", &query[3..])
+        let (engine_id, search_query) = if let Some(stripped) = query.strip_prefix("g ") {
+            ("google", stripped)
+        } else if let Some(stripped) = query.strip_prefix("b ") {
+            ("bing", stripped)
+        } else if let Some(stripped) = query.strip_prefix("bd ") {
+            ("baidu", stripped)
+        } else if let Some(stripped) = query.strip_prefix("ddg ") {
+            ("duckduckgo", stripped)
+        } else if let Some(stripped) = query.strip_prefix("gh ") {
+            ("github", stripped)
+        } else if let Some(stripped) = query.strip_prefix("so ") {
+            ("stackoverflow", stripped)
         } else {
             // 默认使用 Google
             (self.default_engine.as_str(), query)

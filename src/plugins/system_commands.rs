@@ -259,11 +259,7 @@ impl SystemCommandsPlugin {
     }
 
     fn execute_command(&self, command: &str) -> Result<()> {
-        if command.starts_with("ms-settings:") || command.starts_with("ms-") {
-            std::process::Command::new("cmd").args(["/c", "start", "", command]).spawn()?;
-        } else {
-            std::process::Command::new("cmd").args(["/c", "start", "", command]).spawn()?;
-        }
+        std::process::Command::new("cmd").args(["/c", "start", "", command]).spawn()?;
         Ok(())
     }
 }

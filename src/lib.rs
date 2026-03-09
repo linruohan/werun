@@ -1,6 +1,8 @@
-/// WeRun - Windows 启动器库
-///
-/// 提供启动器的核心功能和组件
+//! WeRun - Windows 启动器库
+//!
+//! 提供启动器的核心功能和组件
+#![allow(clippy::disallowed_methods)]
+
 pub mod app;
 pub mod core;
 pub mod platform;

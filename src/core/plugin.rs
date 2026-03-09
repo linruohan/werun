@@ -99,7 +99,7 @@ impl PluginManager {
         }
 
         // 按分数排序
-        results.sort_by(|a, b| b.score.cmp(&a.score));
+        results.sort_by_key(|b| std::cmp::Reverse(b.score));
         results.truncate(limit);
 
         results
